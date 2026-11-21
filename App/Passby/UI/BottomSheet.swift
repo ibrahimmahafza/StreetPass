@@ -43,25 +43,39 @@ struct BottomSheet<Content: View>: View {
     }
 }
 
-/// A round frosted button that floats over the plaza.
-struct OrbButton: View {
-    let symbol: String
-    let label: String
-    let action: () -> Void
+/// The menu along the bottom of the plaza: a frosted bar of icons with a word under each.
+struct MenuBar: View {
+    struct Item: Identifiable {
+        let symbol: String
+        let title: String
+        let action: () -> Void
+        var id: String { title }
+    }
+
+    let items: [Item]
 
     var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Theme.icon)
-                .frame(width: 58, height: 58)
-                .background(.ultraThinMaterial, in: Circle())
-                .background(Color.white.opacity(0.4), in: Circle())
-                .overlay(Circle().stroke(Color.white.opacity(0.95), lineWidth: 2))
-                .shadow(color: Color(hex: 0x466E82).opacity(0.22), radius: 5, y: 3)
+        HStack(spacing: 0) {
+            ForEach(items) { item in
+                Button(action: item.action) {
+                    VStack(spacing: 3) {
+                        Image(systemName: item.symbol).font(.system(size: 20, weight: .semibold))
+                        Text(item.title).font(Theme.font(11.5, .bold))
+                    }
+                    .foregroundStyle(Theme.icon)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 58)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressScaleStyle())
+            }
         }
-        .buttonStyle(PressScaleStyle())
-        .accessibilityLabel(label)
+        .padding(.horizontal, 8)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color.white.opacity(0.95), lineWidth: 2))
+        .shadow(color: Color(hex: 0x466E82).opacity(0.22), radius: 6, y: 3)
+        .padding(.horizontal, 22)
     }
 }
 

@@ -1,7 +1,7 @@
 import Foundation
 
-/// The plaza's camera as plain geometry: it sits above the origin, looks towards negative z and
-/// tilts down at the floor. The simulation uses it to place people by where they appear on screen,
+/// The plaza's camera as plain geometry: it hangs above the floor, looks towards negative z and
+/// tilts down. The simulation uses it to place people by where they appear on screen,
 /// and the 3D view builds its real camera from the same numbers so the two always agree.
 ///
 /// Screen positions run 0...1: `u` left to right, `v` bottom to top.
@@ -14,12 +14,32 @@ public struct PlazaCamera: Equatable, Sendable {
     public let pitch: Double
     /// Vertical field of view in radians.
     public let fieldOfView: Double
+    /// Where over the floor the camera hangs.
+    public let x: Double
+    public let z: Double
 
-    public init(aspect: Double, height: Double = 27, pitch: Double = 40 * .pi / 180, fieldOfView: Double = 38 * .pi / 180) {
+    public init(
+        aspect: Double, height: Double = 27, pitch: Double = 40 * .pi / 180, fieldOfView: Double = 38 * .pi / 180,
+        x: Double = 0, z: Double = 0
+    ) {
         self.aspect = aspect
         self.height = height
         self.pitch = pitch
         self.fieldOfView = fieldOfView
+        self.x = x
+        self.z = z
+    }
+
+    /// The same camera with a narrower view, so everything appears `factor` times larger.
+    public func zoomed(by factor: Double) -> PlazaCamera {
+        PlazaCamera(
+            aspect: aspect, height: height, pitch: pitch,
+            fieldOfView: 2 * atan(tan(fieldOfView / 2) / max(factor, 0.01)), x: x, z: z)
+    }
+
+    /// The same camera slid across the floor.
+    public func moved(x dx: Double, z dz: Double) -> PlazaCamera {
+        PlazaCamera(aspect: aspect, height: height, pitch: pitch, fieldOfView: fieldOfView, x: x + dx, z: z + dz)
     }
 
     private var tanV: Double { tan(fieldOfView / 2) }
@@ -35,16 +55,17 @@ public struct PlazaCamera: Equatable, Sendable {
         let dz = -cos(pitch) - sin(pitch) * ny
         guard dy < -1e-9 else { return nil }
         let t = height / -dy
-        return (t * dx, t * dz)
+        return (x + t * dx, z + t * dz)
     }
 
     /// Where a point in the world appears on screen, or nil if it is behind the camera.
-    public func screen(x: Double, y: Double, z: Double) -> (u: Double, v: Double)? {
+    public func screen(x px: Double, y: Double, z pz: Double) -> (u: Double, v: Double)? {
         let wy = y - height
-        let depth = -sin(pitch) * wy - cos(pitch) * z
+        let wz = pz - z
+        let depth = -sin(pitch) * wy - cos(pitch) * wz
         guard depth > 1e-9 else { return nil }
-        let right = x
-        let up = cos(pitch) * wy - sin(pitch) * z
+        let right = px - x
+        let up = cos(pitch) * wy - sin(pitch) * wz
         return ((right / (depth * tanH) + 1) / 2, (up / (depth * tanV) + 1) / 2)
     }
 }

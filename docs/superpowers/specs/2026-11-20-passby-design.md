@@ -119,4 +119,7 @@ Achraf handed the how to Claude; approach 1 is Claude's pick.
 - **Passing counts by last sighting.** Someone counts as passed again after ten minutes
   out of range, so phones left together stay one pass. Settings has "Forget everyone".
 - **Bluetooth retries within about five seconds** after a failed attempt.
-
+- **Menu bar at the bottom, and zoom.** Achraf later asked for "a menu ui bar at the bottom" and
+  "a feature to be able to zoom", which replaces the round buttons at the top. Pinch zooms up to
+  three times around the fingers; a drag slides the view while zoomed. People are always placed
+  through the unzoomed camera, so zooming never moves them.

@@ -1,7 +1,7 @@
 import PassbyCore
 import SwiftUI
 
-/// The main screen: the plaza fills it, three round buttons float at the top.
+/// The main screen: the plaza fills it, with the menu bar along the bottom. Pinch to zoom.
 struct PlazaView: View {
     @Environment(AppModel.self) private var model
     @State private var scene = PlazaScene()
@@ -26,7 +26,7 @@ struct PlazaView: View {
                         .onTapGesture { dismiss() }
                         .transition(.opacity)
                     panel(sheet)
-                        .frame(maxHeight: geo.size.height - 76, alignment: .bottom)
+                        .frame(maxHeight: geo.size.height - 24, alignment: .bottom)
                         .frame(maxHeight: .infinity, alignment: .bottom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -44,18 +44,12 @@ struct PlazaView: View {
     // MARK: Layers
 
     private var floor: some View {
-        PlazaBackdrop(scene: scene) { point, size in tapped(at: point, in: size) }
+        PlazaBackdrop(scene: scene, startZoom: model.demoZoom) { id in tapped(id) }
             .ignoresSafeArea()
     }
 
     private var controls: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 14) {
-                OrbButton(symbol: "person", label: "Your character") { open(.me) }
-                OrbButton(symbol: "person.2", label: "People you passed") { open(.people) }
-                OrbButton(symbol: "slider.horizontal.3", label: "Settings") { open(.settings) }
-            }
-            .padding(.top, 8)
             Spacer()
             if !arriving {
                 if !waiting.isEmpty {
@@ -68,8 +62,14 @@ struct PlazaView: View {
                         .padding(.horizontal, 24)
                 }
             }
+            MenuBar(items: [
+                .init(symbol: "person", title: "You") { open(.me) },
+                .init(symbol: "person.2", title: "People") { open(.people) },
+                .init(symbol: "slider.horizontal.3", title: "Settings") { open(.settings) },
+            ])
+            .padding(.top, 2)
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, 4)
     }
 
     private var waitingText: String {
@@ -154,8 +154,8 @@ struct PlazaView: View {
         }
     }
 
-    private func tapped(at point: CGPoint, in size: CGSize) {
-        guard sheet == nil, !arriving, let id = scene.person(at: point, in: size),
+    private func tapped(_ id: UUID?) {
+        guard sheet == nil, !arriving, let id,
               let encounter = model.state.encounters.first(where: { $0.id == id })
         else { return }
         if encounter.waiting {

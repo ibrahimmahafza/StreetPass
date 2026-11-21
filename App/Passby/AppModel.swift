@@ -19,6 +19,8 @@ final class AppModel {
     let demoStep: Int
     /// Link screen requested with `-link spotify` or `-link steam`.
     let demoLink: String?
+    /// How far the plaza starts zoomed in, requested with `-zoom <1...3>`.
+    let demoZoom: Double
     /// Passes to simulate right after launch, requested with `-simulate <n>`.
     @ObservationIgnored private var pendingPasses: Int
     @ObservationIgnored private var audioCheck = false
@@ -41,6 +43,7 @@ final class AppModel {
         demo = value("-demo")
         demoStep = value("-step").flatMap { Int($0) } ?? 0
         demoLink = value("-link")
+        demoZoom = value("-zoom").flatMap { Double($0) } ?? 1
         pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }

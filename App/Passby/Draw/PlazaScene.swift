@@ -51,9 +51,9 @@ final class PlazaScene {
 
     // Where things sit on screen, as fractions: u across, v up from the bottom.
     private static let crowdU = 0.10...0.90
-    private static let crowdV = 0.21...0.63
-    private static let ringV = 0.74
-    private static let greetV = 0.565
+    private static let crowdV = 0.27...0.67
+    private static let ringV = 0.78
+    private static let greetV = 0.585
 
     /// The camera the stage is using. People are placed by where they will appear through it.
     var camera = PlazaCamera(aspect: 402.0 / 874.0)
@@ -116,11 +116,12 @@ final class PlazaScene {
         arrival = (ids, done)
     }
 
-    /// The person drawn at a point in a view of this size, nearest first.
-    func person(at point: CGPoint, in size: CGSize) -> UUID? {
+    /// The person drawn at a point in a view of this size, nearest first, as seen through `lens`
+    /// (the camera after any zooming).
+    func person(at point: CGPoint, in size: CGSize, through lens: PlazaCamera) -> UUID? {
         for w in walkers.sorted(by: { $0.z > $1.z }) {
-            guard let feet = camera.screen(x: w.x, y: 0, z: w.z),
-                  let head = camera.screen(x: w.x, y: Self.characterHeight * 1.12, z: w.z)
+            guard let feet = lens.screen(x: w.x, y: 0, z: w.z),
+                  let head = lens.screen(x: w.x, y: Self.characterHeight * 1.12, z: w.z)
             else { continue }
             let top = (1 - head.v) * size.height, bottom = (1 - feet.v) * size.height
             let reach = (bottom - top) * 0.34
