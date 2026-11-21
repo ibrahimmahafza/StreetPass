@@ -127,6 +127,16 @@ final class AppModel {
         }
     }
 
+    /// Why the island will not turn green outside the app, or nil when it will.
+    var islandNote: String? {
+        live.allowed ? nil : "Live Activities are off for Passby in iOS Settings, so the island only turns green inside the app."
+    }
+
+    /// Empties the plaza, for a clean start before a demo.
+    func forgetEveryone() {
+        state.forgetEveryone()
+    }
+
     // MARK: Passing
 
     func handlePass(_ profile: Profile) {
@@ -186,7 +196,7 @@ final class AppModel {
                 s.encounters[j].times = Int.random(in: 1...6, using: &rng)
             }
         }
-        if demo != "plaza" && demo != "gallery" && demo != "icon" {
+        if !["plaza", "gallery", "icon"].contains(demo) {
             var lina = demoProfile(named: "Lina")
             lina.look = Look(skin: 2, hair: 3, hairColor: 1, eyes: 0, mouth: 0, hoodie: 7, extra: 0)
             lina.instagram = "lina.mtl"

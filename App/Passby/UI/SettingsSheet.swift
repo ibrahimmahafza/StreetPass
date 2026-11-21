@@ -6,6 +6,7 @@ struct SettingsSheet: View {
     let onClose: () -> Void
 
     @State private var editing: LinkEntry.Kind?
+    @State private var confirmingForget = false
 
     var body: some View {
         @Bindable var model = model
@@ -40,16 +41,31 @@ struct SettingsSheet: View {
                     .padding(.vertical, 12)
                     Divider().overlay(Theme.line)
                 }
-                Button("Simulate a pass") {
-                    model.simulatePass()
-                    onClose()
+                if let note = model.islandNote {
+                    Text(note)
+                        .font(Theme.font(12.5))
+                        .foregroundStyle(Theme.soft)
                 }
-                .buttonStyle(PlainButtonStyleWhite())
+                HStack(spacing: 8) {
+                    Button("Simulate a pass") {
+                        model.simulatePass()
+                        onClose()
+                    }
+                    .buttonStyle(PlainButtonStyleWhite())
+                    Button("Forget everyone") { confirmingForget = true }
+                        .buttonStyle(PlainButtonStyleWhite())
+                        .disabled(model.state.encounters.isEmpty)
+                }
                 .padding(.top, 4)
-                Text("For demos and for the simulator, where Bluetooth is unavailable.")
+                .confirmationDialog("Forget everyone you have passed?", isPresented: $confirmingForget, titleVisibility: .visible) {
+                    Button("Forget everyone", role: .destructive) {
+                        model.forgetEveryone()
+                        onClose()
+                    }
+                }
+                Text("Simulate a pass is for demos and the simulator, where Bluetooth is unavailable. Forget everyone empties the plaza so the same phones can pass again.")
                     .font(Theme.font(12.5))
                     .foregroundStyle(Theme.soft)
-                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }

@@ -9,6 +9,9 @@ final class LiveActivityController {
     private var activity: Activity<PassActivityAttributes>?
     private var shown: Int?
 
+    /// False when Live Activities are switched off for the app in iOS Settings.
+    var allowed: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
+
     /// Safe to call as often as you like. `canStart` is whether the app is on screen.
     func sync(waiting: Int, wanted: Bool, canStart: Bool) {
         if activity == nil {

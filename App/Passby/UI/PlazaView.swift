@@ -44,17 +44,8 @@ struct PlazaView: View {
     // MARK: Layers
 
     private var floor: some View {
-        TimelineView(.animation) { timeline in
-            Canvas { context, size in
-                let time = timeline.date.timeIntervalSinceReferenceDate
-                context.withCGContext { cg in
-                    scene.frame(in: cg, size: size, time: time)
-                }
-            }
-        }
-        .gesture(SpatialTapGesture().onEnded { tap in tapped(at: tap.location) })
-        .ignoresSafeArea()
-        .accessibilityLabel("Plaza with \(model.state.encounters.count) people")
+        PlazaBackdrop(scene: scene) { point, size in tapped(at: point, in: size) }
+            .ignoresSafeArea()
     }
 
     private var controls: some View {
@@ -120,6 +111,8 @@ struct PlazaView: View {
     // MARK: Actions
 
     private func open(_ target: Sheet) {
+        // The menus wait while new people are walking up, so nobody gets skipped.
+        guard !arriving else { return }
         if case .card = target {} else { fromList = false }
         model.audio.blip()
         withAnimation(.snappy(duration: 0.3)) { sheet = target }
@@ -128,7 +121,7 @@ struct PlazaView: View {
     /// Closes the open panel. During an arrival it moves on to the next person instead.
     private func dismiss() {
         model.audio.blip()
-        guard arriving, let current = queue.first else {
+        guard arriving, case .card(_, arriving: true)? = sheet, let current = queue.first else {
             fromList = false
             withAnimation(.snappy(duration: 0.3)) { sheet = nil }
             return
@@ -161,8 +154,8 @@ struct PlazaView: View {
         }
     }
 
-    private func tapped(at point: CGPoint) {
-        guard sheet == nil, !arriving, let id = scene.person(at: point),
+    private func tapped(at point: CGPoint, in size: CGSize) {
+        guard sheet == nil, !arriving, let id = scene.person(at: point, in: size),
               let encounter = model.state.encounters.first(where: { $0.id == id })
         else { return }
         if encounter.waiting {

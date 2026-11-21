@@ -104,3 +104,18 @@ Achraf handed the how to Claude; approach 1 is Claude's pick.
 - How the project file is produced.
 - The exact Bluetooth exchange, within the 512-byte limit.
 - The melody and arrangement of the music loop.
+
+## Changes after the first build (2026-11-20, late)
+
+- **Characters are low-poly 3D.** After seeing the first build Achraf dropped the Mii
+  request ("it doesn't have to be the miis") and asked for the characters to be
+  "slimmer, lower poly, facial features sharper, and 3d". They are now flat-faced 3D
+  models built in code (`Character3D.swift`): slim body, bevelled box head, sharp
+  cut-out eyes, brows, nose and mouth. Same seven choices as before.
+- **The plaza is real 3D** (SceneKit): a tilted camera over a checkerboard floor, people
+  turn to face where they walk. `PlazaScene` is the simulation, `PlazaStage` draws it,
+  `PlazaCamera` in PassbyCore is the shared geometry. Cards and lists use rendered stills.
+- **Passing counts by last sighting.** Someone counts as passed again after ten minutes
+  out of range, so phones left together stay one pass. Settings has "Forget everyone".
+- **Bluetooth retries within about five seconds** after a failed attempt.
+

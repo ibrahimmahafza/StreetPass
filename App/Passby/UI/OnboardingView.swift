@@ -13,6 +13,8 @@ struct OnboardingView: View {
     @State private var games: [String] = []
     @State private var linking: LinkEntry.Kind?
     @FocusState private var typing: Bool
+    /// The empty plaza behind the panel.
+    @State private var backdrop = PlazaScene()
 
     private static let titles = ["What's your name?", "Make your character", "Your Instagram", "What are you into?"]
 
@@ -20,7 +22,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            StillFloor().ignoresSafeArea()
+            PlazaBackdrop(scene: backdrop).ignoresSafeArea()
             VStack(spacing: 0) {
                 Text("Passby")
                     .font(Theme.font(30, .heavy))
@@ -189,17 +191,5 @@ struct OnboardingView: View {
             Profile(
                 id: UUID(), name: trimmedName, look: look, instagram: instagram, artists: artists, games: games,
                 greeting: "Hi, I'm \(trimmedName)!"))
-    }
-}
-
-/// The plaza floor with nobody on it, as a backdrop.
-struct StillFloor: View {
-    private let scene = PlazaScene()
-
-    var body: some View {
-        Canvas { context, size in
-            context.withCGContext { cg in scene.frame(in: cg, size: size, time: 0) }
-        }
-        .accessibilityHidden(true)
     }
 }

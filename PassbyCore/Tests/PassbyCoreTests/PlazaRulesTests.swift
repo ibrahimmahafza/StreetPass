@@ -46,6 +46,42 @@ final class PlazaRulesTests: XCTestCase {
         XCTAssertEqual(s.encounters[0].lastMet, later)
     }
 
+    func testPhonesLeftTogetherNeverCountAgain() {
+        var s = PlazaState()
+        let p = person("Lina")
+        _ = s.recordPass(p, at: t0)
+        s.greet(p.id)
+        // Two phones on a table see each other every minute and a half for an hour.
+        for sighting in 1...40 {
+            XCTAssertEqual(s.recordPass(p, at: t0.addingTimeInterval(Double(sighting) * 90)), .ignored)
+        }
+        XCTAssertEqual(s.encounters[0].times, 1)
+        XCTAssertFalse(s.encounters[0].waiting)
+        XCTAssertEqual(s.encounters[0].lastMet, t0)
+    }
+
+    func testWalkingAwayAndComingBackCountsAgain() {
+        var s = PlazaState()
+        let p = person("Lina")
+        _ = s.recordPass(p, at: t0)
+        _ = s.recordPass(p, at: t0.addingTimeInterval(90))
+        // Last seen at 90 s; gone for ten minutes after that.
+        XCTAssertEqual(s.recordPass(p, at: t0.addingTimeInterval(90 + 599)), .ignored)
+        XCTAssertEqual(s.recordPass(p, at: t0.addingTimeInterval(90 + 599 + 600)), .again)
+        XCTAssertEqual(s.encounters[0].times, 2)
+    }
+
+    func testForgetEveryoneClearsThePlaza() {
+        var s = PlazaState()
+        let me = person("Me")
+        s.me = me
+        _ = s.recordPass(person("A"), at: t0)
+        _ = s.recordPass(person("B"), at: t0)
+        s.forgetEveryone()
+        XCTAssertTrue(s.encounters.isEmpty)
+        XCTAssertEqual(s.me, me)
+    }
+
     func testOwnProfileIsIgnored() {
         var s = PlazaState()
         let me = person("Me")

@@ -27,9 +27,12 @@ final class PassService: NSObject {
     /// Phones we are talking to right now. Core Bluetooth drops a peripheral nobody holds on to.
     private var talking: [UUID: CBPeripheral] = [:]
     private var lastSeen: [UUID: Date] = [:]
+    /// Phones whose profile has been read during the current connection.
+    private var answered: Set<UUID> = []
     private var rescan: Timer?
 
     private static let revisitAfter: TimeInterval = 60
+    private static let retryAfter: TimeInterval = 5
     private static let giveUpAfter: TimeInterval = 10
 
     func start(profile: Profile) {
@@ -60,6 +63,8 @@ final class PassService: NSObject {
             peripheral.removeAllServices()
         }
         talking = [:]
+        lastSeen = [:]
+        answered = []
         central = nil
         peripheral = nil
         status = .off
@@ -68,7 +73,14 @@ final class PassService: NSObject {
     private func scan() {
         guard let central, central.state == .poweredOn else { return }
         central.stopScan()
-        central.scanForPeripherals(withServices: [Self.serviceID])
+        // Reporting duplicates lets a phone whose first attempt failed be tried again within seconds
+        // instead of at the next rescan. iOS ignores the option in the background.
+        central.scanForPeripherals(withServices: [Self.serviceID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+    }
+
+    /// Makes a phone that did not finish eligible again shortly, instead of after the full revisit time.
+    private func retrySoon(_ id: UUID) {
+        lastSeen[id] = Date().addingTimeInterval(Self.retryAfter - Self.revisitAfter)
     }
 
     private func hangUp(_ device: CBPeripheral) {
@@ -127,7 +139,7 @@ extension PassService: CBCentralManagerDelegate, CBPeripheralDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.giveUpAfter) { [weak self] in
                 guard let self, self.talking[id] === device else { return }
                 self.hangUp(device)
-                self.lastSeen[id] = nil     // it never answered, so try again next time it shows up
+                self.retrySoon(id)
             }
         }
     }
@@ -137,11 +149,19 @@ extension PassService: CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didFailToConnect device: CBPeripheral, error: Error?) {
-        MainActor.assumeIsolated { talking[device.identifier] = nil }
+        MainActor.assumeIsolated {
+            talking[device.identifier] = nil
+            retrySoon(device.identifier)
+        }
     }
 
     nonisolated func centralManager(_ central: CBCentralManager, didDisconnectPeripheral device: CBPeripheral, error: Error?) {
-        MainActor.assumeIsolated { talking[device.identifier] = nil }
+        MainActor.assumeIsolated {
+            let id = device.identifier
+            talking[id] = nil
+            // A link that dropped before the profile was read is worth another go straight away.
+            if answered.remove(id) == nil { retrySoon(id) }
+        }
     }
 
     nonisolated func peripheral(_ device: CBPeripheral, didDiscoverServices error: Error?) {
@@ -164,7 +184,12 @@ extension PassService: CBCentralManagerDelegate, CBPeripheralDelegate {
             if characteristic.uuid == Self.profileID, let data = characteristic.value, let profile = Profile(wireData: data) {
                 onProfile?(profile)
             }
-            hangUp(device)
+            answered.insert(device.identifier)
+            lastSeen[device.identifier] = Date()
+            // Both phones read each other over what may be one shared link, so give the other side a moment to finish.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                self?.hangUp(device)
+            }
         }
     }
 }

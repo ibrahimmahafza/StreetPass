@@ -2,66 +2,61 @@ import CoreGraphics
 import Foundation
 import PassbyCore
 
-/// Maps the plaza floor (x across, z away from the viewer) onto the screen: a tilted floor seen from above.
-struct Projection {
-    let size: CGSize
-    private let d: CGFloat
-    private let f: CGFloat
-    private let k: CGFloat
-    private let horizon: CGFloat
-    private let cameraHeight: CGFloat
-
-    init(size: CGSize) {
-        self.size = size
-        let near = size.width / 8.04          // points per unit at the front edge
-        let span = size.height + 26           // the floor runs a little past the top and bottom
-        d = span / (0.5611 * near)            // far edge is drawn at 0.48 of the front scale
-        cameraHeight = 1.079 * d              // gives a tilt of about 0.7 mid-floor
-        f = near * d
-        k = f * cameraHeight
-        horizon = -16 - k / (d + Self.farDepthFactor * d)
-    }
-
-    private static let farDepthFactor: CGFloat = 1.083
-    var farDepth: CGFloat { Self.farDepthFactor * d }
-    /// Distance from the viewer to the front edge of the floor.
-    var depthOffset: CGFloat { d }
-
-    func point(_ x: CGFloat, _ z: CGFloat) -> CGPoint {
-        CGPoint(x: size.width / 2 + x * f / (z + d), y: horizon + k / (z + d))
-    }
-
-    /// Points per unit at this depth.
-    func scale(_ z: CGFloat) -> CGFloat { f / (z + d) }
-
-    /// How flat a circle lying on the floor looks at this depth.
-    func squash(_ z: CGFloat) -> CGFloat { cameraHeight / (z + d) }
-}
-
-/// The plaza: the floor, the green ring where new people wait, and everyone walking around.
-/// Not observed by SwiftUI; the canvas redraws it every frame.
+/// Who is where in the plaza and what they are doing. It knows nothing about drawing:
+/// `PlazaStage` turns its actors into 3D models every frame.
 final class PlazaScene {
+    /// One person as the stage should show them this frame.
+    struct Actor {
+        let id: UUID
+        let look: Look
+        var x: Double
+        var z: Double
+        /// Radians about the vertical axis; 0 faces the viewer.
+        var heading: Double
+        var walkPhase: CGFloat?
+        var bounce: CGFloat
+    }
+
+    /// The green ring where new people wait.
+    struct Ring {
+        var x: Double
+        var z: Double
+        var radius: Double
+        var visible: Bool
+        /// True while someone is still waiting in it.
+        var active: Bool
+    }
+
     private enum Mode { case wandering, waiting, arriving, arrived }
 
     private struct Walker {
         let id: UUID
         var look: Look
-        var x: CGFloat = 0
-        var z: CGFloat = 0
-        var targetX: CGFloat = 0
-        var targetZ: CGFloat = 0
+        var x = 0.0
+        var z = 0.0
+        var targetX = 0.0
+        var targetZ = 0.0
+        var heading = 0.0
         var wait: Double
-        var phase: CGFloat
+        var phase: Double
         var moving = false
         var mode: Mode
     }
 
-    static let characterHeight: CGFloat = 1.75
-    private static let nearDepth: CGFloat = 4.2
-    private static let farDepth: CGFloat = 16.5
-    private static let ringDepth: CGFloat = 20
-    private static let ringRadius: CGFloat = 1.9
-    private static let greetDepth: CGFloat = 12.4
+    /// Height of a character in floor units.
+    static let characterHeight = 2.3
+    private static let ringRadius = 3.1
+    private static let walkSpeed = 1.9
+    private static let arrivalSpeed = 9.0
+
+    // Where things sit on screen, as fractions: u across, v up from the bottom.
+    private static let crowdU = 0.10...0.90
+    private static let crowdV = 0.21...0.63
+    private static let ringV = 0.74
+    private static let greetV = 0.565
+
+    /// The camera the stage is using. People are placed by where they will appear through it.
+    var camera = PlazaCamera(aspect: 402.0 / 874.0)
 
     /// The person whose card is open during an arrival; they hop while they talk.
     var talking: UUID?
@@ -71,8 +66,6 @@ final class PlazaScene {
     /// How many people have been given a starting spot, so each new one fills a gap.
     private var placed = 0
     private var arrival: (ids: [UUID], done: () -> Void)?
-    private var lastTime: TimeInterval?
-    private var projection: Projection?
 
     // MARK: People
 
@@ -101,15 +94,18 @@ final class PlazaScene {
         layoutRing()
     }
 
-    /// Walks these people from the ring to the front, then calls `done` once.
+    /// Walks these people from the ring to where they greet you, then calls `done` once.
     func beginArrival(_ ids: [UUID], instantly: Bool = false, done: @escaping () -> Void) {
         for (n, id) in ids.enumerated() {
             guard let i = walkers.firstIndex(where: { $0.id == id }) else { continue }
-            walkers[i].targetX = max(-3, min(3, (CGFloat(n) - CGFloat(ids.count - 1) / 2) * 1.3))
-            walkers[i].targetZ = Self.greetDepth - CGFloat(n % 2) * 0.7
+            let u = min(0.8, max(0.2, 0.5 + (Double(n) - Double(ids.count - 1) / 2) * 0.2))
+            let spot = camera.ground(u: u, v: Self.greetV - Double(n % 2) * 0.03) ?? (0, -30)
+            walkers[i].targetX = spot.x
+            walkers[i].targetZ = spot.z
             if instantly {
-                walkers[i].x = walkers[i].targetX
-                walkers[i].z = walkers[i].targetZ
+                walkers[i].x = spot.x
+                walkers[i].z = spot.z
+                walkers[i].heading = 0
                 walkers[i].mode = .arrived
                 walkers[i].moving = false
             } else {
@@ -120,88 +116,70 @@ final class PlazaScene {
         arrival = (ids, done)
     }
 
-    func person(at point: CGPoint) -> UUID? {
-        guard let pr = projection else { return nil }
-        for w in walkers.sorted(by: { $0.z < $1.z }) {
-            let feet = pr.point(w.x, w.z)
-            let s = pr.scale(w.z) * Self.characterHeight / 100
-            if abs(point.x - feet.x) < 28 * s, point.y < feet.y + 6 * s, point.y > feet.y - 110 * s {
+    /// The person drawn at a point in a view of this size, nearest first.
+    func person(at point: CGPoint, in size: CGSize) -> UUID? {
+        for w in walkers.sorted(by: { $0.z > $1.z }) {
+            guard let feet = camera.screen(x: w.x, y: 0, z: w.z),
+                  let head = camera.screen(x: w.x, y: Self.characterHeight * 1.12, z: w.z)
+            else { continue }
+            let top = (1 - head.v) * size.height, bottom = (1 - feet.v) * size.height
+            let reach = (bottom - top) * 0.34
+            if abs(point.x - feet.u * size.width) < reach, point.y > top, point.y < bottom + reach * 0.3 {
                 return w.id
             }
         }
         return nil
     }
 
-    private func randomSpot() -> (CGFloat, CGFloat) {
+    private func randomSpot() -> (Double, Double) {
         spot(.random(in: 0...1, using: &rng), .random(in: 0...1, using: &rng))
     }
 
     /// Where a newcomer to the crowd first stands. Successive people land in the gaps left by
     /// earlier ones, so the plaza looks evenly filled however many there are.
-    private func startingSpot() -> (CGFloat, CGFloat) {
-        let n = CGFloat(placed)
+    private func startingSpot() -> (Double, Double) {
+        let n = Double(placed)
         placed += 1
         return spot((0.37 + n * 0.754_877_666).truncatingRemainder(dividingBy: 1), (0.11 + n * 0.569_840_291).truncatingRemainder(dividingBy: 1))
     }
 
-    /// A spot on the floor from two fractions: `across` the width and `up` the screen.
-    private func spot(_ across: CGFloat, _ up: CGFloat) -> (CGFloat, CGFloat) {
-        // Even spacing on screen, not in depth: far rows are squeezed together by the perspective.
-        let d = projection?.depthOffset ?? 32
-        let near = 1 / (Self.nearDepth + d), far = 1 / (Self.farDepth + d)
-        let z = 1 / (near + (far - near) * up) - d
-        let reach = 3.3 + 0.12 * z
-        return ((across * 2 - 1) * reach, z)
+    /// A spot in the crowd's part of the floor from two fractions: `across` the screen and `up` it.
+    private func spot(_ across: Double, _ up: Double) -> (Double, Double) {
+        let u = Self.crowdU.lowerBound + across * (Self.crowdU.upperBound - Self.crowdU.lowerBound)
+        let v = Self.crowdV.lowerBound + up * (Self.crowdV.upperBound - Self.crowdV.lowerBound)
+        return camera.ground(u: u, v: v) ?? (0, -30)
+    }
+
+    private var ringCentre: (x: Double, z: Double) {
+        camera.ground(u: 0.5, v: Self.ringV) ?? (0, -50)
     }
 
     private func layoutRing() {
+        let centre = ringCentre
         let waiting = walkers.indices.filter { walkers[$0].mode == .waiting }
         for (slot, i) in waiting.enumerated() {
             let row = slot / 3
             let inRow = min(3, waiting.count - row * 3)
-            walkers[i].x = (CGFloat(slot % 3) - CGFloat(inRow - 1) / 2) * 1.15
-            walkers[i].z = Self.ringDepth + 0.45 - CGFloat(row) * 0.9
+            walkers[i].x = centre.x + (Double(slot % 3) - Double(inRow - 1) / 2) * 1.9
+            walkers[i].z = centre.z - 0.6 + Double(row) * 1.5
+            walkers[i].heading = 0
         }
     }
 
     // MARK: Frame
 
-    func frame(in cg: CGContext, size: CGSize, time: TimeInterval) {
-        let dt = min(0.05, max(0, time - (lastTime ?? time)))
-        lastTime = time
-        step(dt)
-
-        let pr = Projection(size: size)
-        projection = pr
-        drawFloor(cg, pr)
-        let anyWaiting = walkers.contains { $0.mode == .waiting }
-        if anyWaiting || walkers.contains(where: { $0.mode == .arriving }) {
-            drawRing(cg, pr, time: time, active: anyWaiting)
-        }
-        for w in walkers.sorted(by: { $0.z > $1.z }) {
-            var pose = Pose()
-            if w.moving {
-                pose.walkPhase = w.phase
-            } else if w.mode == .waiting {
-                pose.bounce = abs(sin(CGFloat(time) * 3 + w.phase)) * 2.4
-            } else if w.id == talking {
-                pose.bounce = abs(sin(CGFloat(time) * 6)) * 1.8
-            }
-            CharacterRenderer.draw(
-                w.look, in: cg, feet: pr.point(w.x, w.z), scale: pr.scale(w.z) * Self.characterHeight / 100, pose: pose)
-        }
-    }
-
-    private func step(_ dt: Double) {
+    func step(_ dt: Double) {
         for i in walkers.indices {
+            var facing = 0.0
             switch walkers[i].mode {
             case .wandering:
                 if walkers[i].moving {
-                    if advance(i, speed: 1.2, dt: dt, arriveWithin: 0.08) {
+                    if advance(i, speed: Self.walkSpeed, dt: dt, arriveWithin: 0.1) {
                         walkers[i].moving = false
                         walkers[i].wait = .random(in: 1.5...6.5, using: &rng)
                     } else {
-                        walkers[i].phase += CGFloat(dt) * 8.5
+                        walkers[i].phase += dt * 8.5
+                        facing = atan2(walkers[i].targetX - walkers[i].x, walkers[i].targetZ - walkers[i].z)
                     }
                 } else {
                     walkers[i].wait -= dt
@@ -211,90 +189,60 @@ final class PlazaScene {
                     }
                 }
             case .arriving:
-                if advance(i, speed: 5.5, dt: dt, arriveWithin: 0.12) {
+                if advance(i, speed: Self.arrivalSpeed, dt: dt, arriveWithin: 0.15) {
                     walkers[i].mode = .arrived
                     walkers[i].moving = false
                 } else {
-                    walkers[i].phase += CGFloat(dt) * 11
+                    walkers[i].phase += dt * 11
+                    facing = atan2(walkers[i].targetX - walkers[i].x, walkers[i].targetZ - walkers[i].z)
                 }
             case .waiting, .arrived:
                 break
             }
+            // Turn towards where they are going, or back to face the viewer, the short way round.
+            var turn = (facing - walkers[i].heading).truncatingRemainder(dividingBy: 2 * .pi)
+            if turn > .pi { turn -= 2 * .pi }
+            if turn < -.pi { turn += 2 * .pi }
+            walkers[i].heading += turn * min(1, dt * 7)
         }
         if let arrival, !arrival.ids.contains(where: { id in walkers.contains { $0.id == id && $0.mode == .arriving } }) {
             self.arrival = nil
-            // The canvas is mid-draw here; changing view state has to wait for the next turn.
+            // Called from the display link; let the frame finish before view state changes.
             DispatchQueue.main.async(execute: arrival.done)
         }
     }
 
+    func actors(time: Double) -> [Actor] {
+        walkers.map { w in
+            var actor = Actor(id: w.id, look: w.look, x: w.x, z: w.z, heading: w.heading, walkPhase: nil, bounce: 0)
+            if w.moving {
+                actor.walkPhase = CGFloat(w.phase)
+            } else if w.mode == .waiting {
+                actor.bounce = CGFloat(abs(sin(time * 3 + w.phase)) * 2.4)
+            } else if w.id == talking {
+                actor.bounce = CGFloat(abs(sin(time * 6)) * 1.8)
+            }
+            return actor
+        }
+    }
+
+    func ring() -> Ring {
+        let centre = ringCentre
+        let waiting = walkers.contains { $0.mode == .waiting }
+        return Ring(
+            x: centre.x, z: centre.z, radius: Self.ringRadius,
+            visible: waiting || walkers.contains { $0.mode == .arriving }, active: waiting)
+    }
+
     /// Moves a walker towards its target. True once it is there.
-    private func advance(_ i: Int, speed: CGFloat, dt: Double, arriveWithin: CGFloat) -> Bool {
+    private func advance(_ i: Int, speed: Double, dt: Double, arriveWithin: Double) -> Bool {
         let dx = walkers[i].targetX - walkers[i].x
         let dz = walkers[i].targetZ - walkers[i].z
         let distance = hypot(dx, dz)
         if distance < arriveWithin { return true }
-        let move = min(distance, speed * CGFloat(dt))
+        let move = min(distance, speed * dt)
         walkers[i].x += dx / distance * move
         walkers[i].z += dz / distance * move
         return false
-    }
-
-    // MARK: Floor
-
-    private func drawFloor(_ cg: CGContext, _ pr: Projection) {
-        let size = pr.size
-        cg.setFillColor(RGB(0xF8FCFE).cg())
-        cg.fill(CGRect(origin: .zero, size: size))
-        cg.setFillColor(RGB(0xD3EBF4).cg())
-        for zi in -1..<(Int(pr.farDepth) + 3) {
-            for xi in -11..<11 where (xi + zi) & 1 == 0 {
-                let x = CGFloat(xi), z = CGFloat(zi)
-                cg.beginPath()
-                cg.addLines(between: [pr.point(x, z), pr.point(x + 1, z), pr.point(x + 1, z + 1), pr.point(x, z + 1)])
-                cg.closePath()
-                cg.fillPath()
-            }
-        }
-
-        let space = CGColorSpace(name: CGColorSpace.sRGB)!
-        let centre = CGPoint(x: size.width / 2, y: size.height * 0.58)
-        let light = CGGradient(
-            colorsSpace: space,
-            colors: [
-                CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.6), CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0),
-                RGB(0x6EB9D7).cg(0.28),
-            ] as CFArray, locations: [0, 0.5, 1])!
-        cg.drawRadialGradient(
-            light, startCenter: centre, startRadius: 60, endCenter: centre, endRadius: size.height * 0.68,
-            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-        let haze = CGGradient(
-            colorsSpace: space,
-            colors: [CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.95), CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0)] as CFArray,
-            locations: [0, 1])!
-        cg.saveGState()
-        cg.clip(to: CGRect(x: 0, y: 0, width: size.width, height: 160))
-        cg.drawLinearGradient(haze, start: .zero, end: CGPoint(x: 0, y: 160), options: [])
-        cg.restoreGState()
-    }
-
-    private func drawRing(_ cg: CGContext, _ pr: Projection, time: TimeInterval, active: Bool) {
-        let centre = pr.point(0, Self.ringDepth)
-        let rx = Self.ringRadius * pr.scale(Self.ringDepth)
-        let ry = rx * pr.squash(Self.ringDepth)
-        let pulse = 0.5 + 0.5 * sin(CGFloat(time) * 4.2)
-        func oval(_ grow: CGFloat) -> CGRect {
-            CGRect(x: centre.x - rx * grow, y: centre.y - ry * grow, width: rx * 2 * grow, height: ry * 2 * grow)
-        }
-        cg.setFillColor(RGB(0x34D67A).cg(active ? 0.16 + pulse * 0.14 : 0.07))
-        cg.fillEllipse(in: oval(1))
-        cg.setStrokeColor(RGB(0x28C869).cg(active ? 0.9 : 0.35))
-        cg.setLineWidth(2.5)
-        cg.strokeEllipse(in: oval(1))
-        if active {
-            cg.setStrokeColor(RGB(0x34D67A).cg(0.5 * (1 - pulse)))
-            cg.setLineWidth(2)
-            cg.strokeEllipse(in: oval(1 + pulse * 0.25))
-        }
     }
 }

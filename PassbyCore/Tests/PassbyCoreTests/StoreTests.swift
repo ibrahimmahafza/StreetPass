@@ -24,6 +24,18 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(Store(directory: dir).load(), s)
     }
 
+    func testStateSavedBeforeLastSeenExistedStillLoads() throws {
+        var s = PlazaState()
+        _ = s.recordPass(
+            Profile(id: UUID(), name: "Lina", look: .starter, instagram: "", artists: [], games: [], greeting: ""),
+            at: Date(timeIntervalSince1970: 1_800_000_000))
+        s.encounters[0].lastSeen = nil
+        try Store(directory: dir).save(s)
+        let saved = try String(contentsOf: dir.appendingPathComponent("state.json"), encoding: .utf8)
+        XCTAssertFalse(saved.contains("lastSeen"))
+        XCTAssertEqual(Store(directory: dir).load().encounters.count, 1)
+    }
+
     func testMissingFileLoadsEmpty() {
         XCTAssertEqual(Store(directory: dir).load(), PlazaState())
     }
