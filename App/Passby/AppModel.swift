@@ -11,6 +11,10 @@ final class AppModel {
 
     /// Screen requested with `-demo <name>`, for screenshots and demos.
     let demo: String?
+    /// Onboarding step requested with `-step <0...3>`.
+    let demoStep: Int
+    /// Passes to simulate right after launch, requested with `-simulate <n>`.
+    @ObservationIgnored private var pendingPasses: Int
 
     @ObservationIgnored let audio = Audio()
     @ObservationIgnored private let store: Store
@@ -18,7 +22,12 @@ final class AppModel {
 
     init(store: Store, arguments: [String]) {
         self.store = store
-        demo = arguments.firstIndex(of: "-demo").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+        func value(_ flag: String) -> String? {
+            arguments.firstIndex(of: flag).flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+        }
+        demo = value("-demo")
+        demoStep = value("-step").flatMap { Int($0) } ?? 0
+        pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }
         try? store.save(state)
@@ -30,7 +39,21 @@ final class AppModel {
         return AppModel(store: Store(directory: dir), arguments: ProcessInfo.processInfo.arguments)
     }
 
+    /// Runs once the first screen is up.
+    func afterLaunch() {
+        for _ in 0..<pendingPasses { simulatePass() }
+        pendingPasses = 0
+    }
+
     // MARK: You
+
+    func finishOnboarding(_ profile: Profile) {
+        var s = state
+        s.me = profile.normalized()
+        s.spotifyLinked = !profile.artists.isEmpty
+        s.steamLinked = !profile.games.isEmpty
+        state = s
+    }
 
     func setLinked(_ kind: LinkEntry.Kind, items: [String]) {
         switch kind {

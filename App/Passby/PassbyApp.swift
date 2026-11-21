@@ -19,9 +19,9 @@ struct RootView: View {
         if model.demo == "gallery" {
             GalleryView()
         } else if model.state.me == nil {
-            Text("Passby")
+            OnboardingView()
         } else {
-            PlazaView()
+            PlazaView().task { model.afterLaunch() }
         }
     }
 }
