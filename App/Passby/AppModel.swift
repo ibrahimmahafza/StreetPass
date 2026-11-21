@@ -21,7 +21,11 @@ final class AppModel {
     @ObservationIgnored private var pendingPasses: Int
     @ObservationIgnored private var audioCheck = false
 
+    /// Whether Bluetooth passing is working, for Settings.
+    private(set) var passStatus = PassService.Status.off
+
     @ObservationIgnored let audio = Audio()
+    @ObservationIgnored private let pass = PassService()
     @ObservationIgnored private let store: Store
     @ObservationIgnored private var rng = SeededGenerator(seed: 20261120)
 
@@ -38,12 +42,20 @@ final class AppModel {
         try? store.save(state)
         audio.muted = arguments.contains("-mute")
         audioCheck = arguments.contains("-audiocheck")
+        pass.onProfile = { [weak self] profile in self?.handlePass(profile) }
+        pass.onStatus = { [weak self] status in self?.passStatus = status }
         applySettings()
     }
 
     private func applySettings() {
         audio.soundsOn = state.soundsOn
         audio.musicOn = state.musicOn
+        if let me = state.me, state.passingOn {
+            pass.start(profile: me)
+            pass.update(profile: me)
+        } else {
+            pass.stop()
+        }
     }
 
     /// The app came to the front or left it.
@@ -92,7 +104,14 @@ final class AppModel {
 
     /// One line under the Passing switch saying whether passing is working.
     var passingStatus: String {
-        state.passingOn ? "Notices people nearby who also have the app" : "Off. Nobody will notice you either"
+        guard state.passingOn else { return "Off. Nobody will notice you either" }
+        switch passStatus {
+        case .on: return "On. Notices people nearby who have Passby"
+        case .starting, .off: return "Starting"
+        case .bluetoothOff: return "Turn on Bluetooth to pass people"
+        case .denied: return "Allow Bluetooth for Passby in Settings"
+        case .unsupported: return "Not available on this device"
+        }
     }
 
     // MARK: Passing
