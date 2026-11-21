@@ -22,6 +22,8 @@ final class AppModel {
     let demoLink: String?
     /// How far the plaza starts zoomed in, requested with `-zoom <1...3>`.
     let demoZoom: Double
+    /// Degrees the plaza starts turned, requested with `-turn <degrees>`.
+    let demoTurn: Double
     /// Passes to simulate right after launch, requested with `-simulate <n>`.
     @ObservationIgnored private var pendingPasses: Int
     /// Seconds to wait before those passes, requested with `-after <s>`, to try them with the app in the background.
@@ -36,17 +38,33 @@ final class AppModel {
         let id: UUID
         let name: String
         let look: Look
+        /// When the island stops pointing at them.
         let until: Date
     }
 
-    /// Set for the 15 seconds after a pass, while the app says "Time to meet someone new".
+    /// Set for two minutes after a pass, while the island says "Time to make a new friend" and the
+    /// phone keeps working out where the person is.
     private(set) var meeting: Meeting?
-    static let meetingLength: TimeInterval = 15
+    /// While this is in the future the announcement is also up inside the app. It runs for 15 seconds
+    /// from the pass, and again from whenever the app is opened while the meeting is still on.
+    private(set) var popupUntil: Date?
+    /// How long the island keeps the meeting. Outside the app there is time to get the phone out.
+    static let meetingLength: TimeInterval = 120
+    /// How long the announcement stays up inside the app.
+    static let popupLength: TimeInterval = 15
+    /// iOS closes the big island by itself a few seconds after an announcement and an app cannot hold
+    /// it open. With the app in the background the announcement is therefore repeated, silently,
+    /// this many times this far apart, which keeps the big island coming back for about half a minute.
+    static let repeatAnnouncements = 5
+    static let repeatEvery: TimeInterval = 5
 
     /// Where the person being met is, when the phone can tell.
     @ObservationIgnored let finder = NearbyFinder()
     @ObservationIgnored private var meetingEnd: Task<Void, Never>?
+    @ObservationIgnored private var popupEnd: Task<Void, Never>?
+    @ObservationIgnored private var repeats: Task<Void, Never>?
     @ObservationIgnored private var lastPointed = Date.distantPast
+    @ObservationIgnored private var meetingBegan = Date.distantPast
 
     @ObservationIgnored let audio = Audio()
     @ObservationIgnored private let pass = PassService()
@@ -64,6 +82,7 @@ final class AppModel {
         demoStep = value("-step").flatMap { Int($0) } ?? 0
         demoLink = value("-link")
         demoZoom = value("-zoom").flatMap { Double($0) } ?? 1
+        demoTurn = value("-turn").flatMap { Double($0) } ?? 0
         pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
         pendingDelay = value("-after").flatMap { Double($0) } ?? 0
         state = arguments.contains("-reset") ? PlazaState() : store.load()
@@ -71,7 +90,8 @@ final class AppModel {
         try? store.save(state)
         audio.muted = arguments.contains("-mute")
         audioCheck = arguments.contains("-audiocheck")
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let info = Bundle.main.infoDictionary
+        let version = "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
         note("app", "launched, version \(version); profile \(state.me == nil ? "not set up" : "set"), passing \(state.passingOn ? "on" : "off"), \(state.encounters.count) people")
         pass.onProfile = { [weak self] profile, token in self?.handlePass(profile, token: token) }
         pass.onStatus = { [weak self] status in self?.passStatus = status }
@@ -94,8 +114,8 @@ final class AppModel {
     }
 
     /// The green outline follows the number of people waiting, and during a meeting the island
-    /// names the person. With `alert` it opens up to announce them.
-    private func syncIsland(alert: Bool = false) {
+    /// names the person. With `announce` it opens up to say so.
+    private func syncIsland(announce: LiveActivityController.Announce = .no) {
         // The island is hidden while the app is on screen, so direction is only sent to it otherwise.
         let meet = meeting.map {
             LiveActivityController.Meet(
@@ -104,12 +124,16 @@ final class AppModel {
         }
         live.sync(
             waiting: state.waiting.count, wanted: state.me != nil && state.passingOn, canStart: onScreen,
-            meeting: meet, alert: alert)
+            meeting: meet, announce: announce)
     }
 
     /// Turns the island's arrow as new directions arrive, at most once a second.
     private func pointIsland() {
         guard meeting != nil, !onScreen, Date().timeIntervalSince(lastPointed) >= 1 else { return }
+        if lastPointed < meetingBegan {
+            // Worth knowing after a test on real phones: iOS only sometimes lets ranging run out of sight.
+            note("island", "ranging is reaching the island with the app out of sight: \(finder.bearing == nil ? "no direction" : "direction")\(finder.distance == nil ? ", no distance" : ", distance")")
+        }
         lastPointed = Date()
         syncIsland()
     }
@@ -125,9 +149,17 @@ final class AppModel {
         audio.setForeground(active)
         if onScreen != active { note("app", active ? "app in front" : "app left the screen") }
         onScreen = active
-        // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
-        if active, let meeting, meeting.until <= Date() {
-            endMeeting()
+        if active, let meeting {
+            if meeting.until <= Date() {
+                // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
+                endMeeting()
+            } else {
+                // Opened while the island was still pointing at someone: show them here too, and pick
+                // ranging back up, which iOS may have paused while the app was out of sight.
+                repeats?.cancel()
+                showPopup(until: meeting.until)
+                finder.resume()
+            }
         }
         syncIsland()
     }
@@ -221,27 +253,61 @@ final class AppModel {
         beginMeeting(with: profile, token: token)
     }
 
-    /// Starts the 15 seconds of "Time to meet someone new": the popup in the app, the announcement on
-    /// the island, and ranging so an arrow can point at them.
+    /// Starts "Time to make a new friend": the popup in the app for 15 seconds, the announcement on
+    /// the island, and two minutes of ranging so the island and the popup can point at them.
     private func beginMeeting(with profile: Profile, token: Data?) {
         meetingEnd?.cancel()
-        meeting = Meeting(
-            id: profile.id, name: profile.name, look: profile.look,
-            until: Date().addingTimeInterval(Self.meetingLength))
+        repeats?.cancel()
+        meetingBegan = Date()
+        let until = meetingBegan.addingTimeInterval(Self.meetingLength)
+        meeting = Meeting(id: profile.id, name: profile.name, look: profile.look, until: until)
+        showPopup(until: until)
         if let token { finder.find(peer: token) }
-        syncIsland(alert: true)
+        syncIsland(announce: .aloud)
         meetingEnd = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.meetingLength))
             guard !Task.isCancelled else { return }
             self?.endMeeting()
+        }
+        if !onScreen { repeatAnnouncement(for: profile.id) }
+    }
+
+    /// Puts the announcement up inside the app for 15 seconds, or until the meeting ends if that is sooner.
+    private func showPopup(until meetingEnds: Date) {
+        popupEnd?.cancel()
+        let until = min(meetingEnds, Date().addingTimeInterval(Self.popupLength))
+        popupUntil = until
+        popupEnd = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
+            guard !Task.isCancelled else { return }
+            self?.popupUntil = nil
+        }
+    }
+
+    /// With the app out of sight, opens the big island again every few seconds for a while.
+    private func repeatAnnouncement(for id: UUID) {
+        repeats = Task { [weak self] in
+            // Ask iOS for the time to do it; an app woken by Bluetooth is otherwise put back to sleep in seconds.
+            let keepAlive = UIApplication.shared.beginBackgroundTask()
+            defer { UIApplication.shared.endBackgroundTask(keepAlive) }
+            for _ in 0..<Self.repeatAnnouncements {
+                try? await Task.sleep(for: .seconds(Self.repeatEvery))
+                guard !Task.isCancelled, let self, self.meeting?.id == id, !self.onScreen else { return }
+                self.syncIsland(announce: .quietly)
+            }
         }
     }
 
     func endMeeting() {
         meetingEnd?.cancel()
         meetingEnd = nil
+        popupEnd?.cancel()
+        popupEnd = nil
+        repeats?.cancel()
+        repeats = nil
+        popupUntil = nil
         guard meeting != nil else { return }
-        note("app", "the 15 seconds are up")
+        note("app", "the meeting is over")
         meeting = nil
         finder.stop()
         syncIsland()
@@ -311,22 +377,5 @@ final class AppModel {
             s.recordPass(theo, at: now.addingTimeInterval(-300))
         }
         state = s
-    }
-}
-
-/// Repeatable random numbers, so demo screens look the same on every launch.
-struct SeededGenerator: RandomNumberGenerator {
-    private var state: UInt64
-
-    init(seed: UInt64) {
-        state = seed
-    }
-
-    mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
     }
 }

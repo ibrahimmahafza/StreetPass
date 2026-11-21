@@ -2,8 +2,9 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-/// The Live Activity. Normally it is the green outline and a count on the Dynamic Island. For the
-/// 15 seconds after someone is detected it says "Time to meet someone new" and points at them.
+/// The Live Activity. Normally it is the green outline and a count on the Dynamic Island. For a couple
+/// of minutes after someone is detected it says "Time to make a new friend" and shows where they are:
+/// an arrow when the phone can tell the direction, otherwise how far away they are.
 struct PassActivityWidget: Widget {
     private static let green = Color(red: 0.184, green: 0.89, blue: 0.42)
     private static let idle = Color(white: 0.55)
@@ -18,7 +19,7 @@ struct PassActivityWidget: Widget {
                     Self.dot(context.state.waiting, size: 12)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(meeting != nil ? "Time to meet someone new" : Self.line(context.state.waiting))
+                    Text(meeting != nil ? PassActivityAttributes.meetingTitle : Self.line(context.state.waiting))
                         .font(.system(.body, design: .rounded).weight(.semibold))
                     if let meeting {
                         Text(Self.detail(meeting, context.state))
@@ -40,7 +41,7 @@ struct PassActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.center) {
                     VStack(spacing: 2) {
-                        Text(meeting != nil ? "Time to meet someone new" : Self.line(waiting))
+                        Text(meeting != nil ? PassActivityAttributes.meetingTitle : Self.line(waiting))
                             .font(.system(.body, design: .rounded).weight(.semibold))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -70,12 +71,13 @@ struct PassActivityWidget: Widget {
         }
     }
 
-    /// The person being pointed at, or nil once the 15 seconds are up (iOS marks the activity stale then).
+    /// The person being pointed at, or nil once the meeting is over (iOS marks the activity stale then).
     private static func meeting(_ context: ActivityViewContext<PassActivityAttributes>) -> String? {
         context.isStale ? nil : context.state.meeting
     }
 
-    /// An arrow turned towards the person, or a wave when the phone cannot tell which way they are.
+    /// An arrow turned towards the person. When the phone cannot tell which way they are it is how
+    /// far away they are instead, and when it cannot tell that either, a wave.
     @ViewBuilder
     private static func pointer(_ state: PassActivityAttributes.ContentState, size: CGFloat) -> some View {
         if let bearing = state.bearing {
@@ -84,6 +86,14 @@ struct PassActivityWidget: Widget {
                 .foregroundStyle(green)
                 .rotationEffect(.radians(bearing))
                 .frame(width: size, height: size)
+        } else if let distance = state.distance {
+            Text(distance < 0.95 ? "<1m" : "\(Int(distance.rounded()))m")
+                .font(.system(size: max(12, size * 0.62), weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(green)
+                .lineLimit(1)
+                .fixedSize()
+                .frame(minWidth: size, minHeight: size)
         } else {
             Image(systemName: "figure.wave")
                 .font(.system(size: size * 0.8, weight: .bold))

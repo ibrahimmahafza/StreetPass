@@ -2,7 +2,7 @@ import ActivityKit
 import Foundation
 
 /// Keeps one Live Activity showing how many people are waiting, which tints the Dynamic Island green,
-/// and for a short while after someone is detected says "Time to meet someone new".
+/// and for a couple of minutes after someone is detected says "Time to make a new friend".
 ///
 /// iOS only lets an app start a Live Activity while it is on screen, so it starts as soon as the
 /// app opens and is then updated from the background when a pass comes in over Bluetooth.
@@ -16,6 +16,15 @@ final class LiveActivityController {
         var distance: Double?
     }
 
+    /// Whether an update should open the big island (or raise a banner on phones without one).
+    enum Announce {
+        case no
+        /// With the usual sound: the first time someone is detected.
+        case aloud
+        /// Without a sound: to bring the big island back after iOS has closed it.
+        case quietly
+    }
+
     private var activity: Activity<PassActivityAttributes>?
     private var shown: PassActivityAttributes.ContentState?
     private var saidOff = false
@@ -24,8 +33,7 @@ final class LiveActivityController {
     var allowed: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
 
     /// Safe to call as often as you like. `canStart` is whether the app is on screen.
-    /// With `alert`, the island (or a banner on other phones) opens up to announce the meeting.
-    func sync(waiting: Int, wanted: Bool, canStart: Bool, meeting: Meet? = nil, alert: Bool = false) {
+    func sync(waiting: Int, wanted: Bool, canStart: Bool, meeting: Meet? = nil, announce: Announce = .no) {
         if activity == nil {
             activity = Activity<PassActivityAttributes>.activities.first { $0.activityState == .active }
         } else if activity?.activityState != .active {
@@ -46,13 +54,16 @@ final class LiveActivityController {
         // and the widget goes back to the count, even if the app is not running to tell it to.
         let content = ActivityContent(state: state, staleDate: meeting?.until)
         if let activity {
-            guard alert || shown != state else { return }
+            guard announce != .no || shown != state else { return }
             shown = state
-            let announce: AlertConfiguration? = alert
-                ? meeting.map { AlertConfiguration(title: "Time to meet someone new", body: "\($0.name) is nearby", sound: .default) }
-                : nil
-            if announce != nil { note("island", "announcing \(meeting?.name ?? "someone") on the island") }
-            Task { await activity.update(content, alertConfiguration: announce) }
+            var alert: AlertConfiguration?
+            if announce != .no, let meeting {
+                alert = AlertConfiguration(
+                    title: "\(PassActivityAttributes.meetingTitle)", body: "\(meeting.name) is nearby",
+                    sound: announce == .aloud ? .default : .named("quiet.wav"))
+                note("island", announce == .aloud ? "announcing \(meeting.name) on the island" : "opening the island again for \(meeting.name)")
+            }
+            Task { await activity.update(content, alertConfiguration: alert) }
         } else if canStart {
             do {
                 activity = try Activity.request(attributes: PassActivityAttributes(), content: content, pushType: nil)

@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		12A4ABF123BEF2F3210F3182 /* NearbyFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DDE6E47898472AE3153CDDD /* NearbyFinder.swift */; };
 		24DA64FC0FAC9E4C4F00F504 /* theme.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5BB94B6885493A77B2E6EA8B /* theme.wav */; };
-		4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813D2F48030F4942002B6502 /* PlazaScene.swift */; };
 		4B1BE9CE1C34501B32ABBF54 /* SpotifyLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F1C6B23921FD86F4ECA3361 /* SpotifyLink.swift */; };
 		4C5D29241379F654B3EA2762 /* CharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */; };
 		54D8F3EA383B8E1B59F5E724 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
@@ -22,6 +21,7 @@
 		6C60932FA789C4781DA18E3D /* Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21D9985628610A83ED707CAB /* Diagnostics.swift */; };
 		6ECED3503D3ECD7EF0198AE0 /* LiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7484DE6AA01C697F44CA905A /* LiveActivityController.swift */; };
 		72215AE10BD8EBB02ABD276D /* PeopleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E277D15A320CF51C949395 /* PeopleSheet.swift */; };
+		72C61F8174E38ED9A7A1E9A9 /* quiet.wav in Resources */ = {isa = PBXBuildFile; fileRef = 334C33ACBA6E4BD93938C3B5 /* quiet.wav */; };
 		746FCA5B03F917D33D18EBE6 /* PlazaStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82CCFFF8CA5632109EC9BCA1 /* PlazaStage.swift */; };
 		7B5D0213C1C0FA69645A946E /* BodyMesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D7000B9A752A9449F9C09B6 /* BodyMesh.swift */; };
 		7F34DF3F5190E28C48E9CBAA /* SteamLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E3C196E8553DF5E8D6112FA /* SteamLink.swift */; };
@@ -80,6 +80,7 @@
 		21D9985628610A83ED707CAB /* Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Diagnostics.swift; sourceTree = "<group>"; };
 		270CA92852530053CFE22FA9 /* CharacterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterSheet.swift; sourceTree = "<group>"; };
 		2AD65C5E8045F4EDF79FF36D /* PassActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassActivityWidget.swift; sourceTree = "<group>"; };
+		334C33ACBA6E4BD93938C3B5 /* quiet.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = quiet.wav; sourceTree = "<group>"; };
 		3D7000B9A752A9449F9C09B6 /* BodyMesh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyMesh.swift; sourceTree = "<group>"; };
 		493DFDA6E1444F36289A94EE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterView.swift; sourceTree = "<group>"; };
@@ -96,7 +97,6 @@
 		7E9869905F705A49DA04115E /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassService.swift; sourceTree = "<group>"; };
 		7F1C6B23921FD86F4ECA3361 /* SpotifyLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyLink.swift; sourceTree = "<group>"; };
-		813D2F48030F4942002B6502 /* PlazaScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaScene.swift; sourceTree = "<group>"; };
 		82CCFFF8CA5632109EC9BCA1 /* PlazaStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaStage.swift; sourceTree = "<group>"; };
 		8A0DC52099855A0C74C2D8B7 /* PassbyLive.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PassbyLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		94E277D15A320CF51C949395 /* PeopleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleSheet.swift; sourceTree = "<group>"; };
@@ -208,7 +208,6 @@
 				B9566C0ED9B036B2584D2761 /* Character3D.swift */,
 				168410BA56504B2923F0F463 /* CharacterSnapshot.swift */,
 				C5E6C67ED9841916C98FCFFE /* Palette.swift */,
-				813D2F48030F4942002B6502 /* PlazaScene.swift */,
 				82CCFFF8CA5632109EC9BCA1 /* PlazaStage.swift */,
 			);
 			path = Draw;
@@ -267,6 +266,7 @@
 		FA7C268DE5B5FDB79686EF19 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				334C33ACBA6E4BD93938C3B5 /* quiet.wav */,
 				5BB94B6885493A77B2E6EA8B /* theme.wav */,
 			);
 			path = Resources;
@@ -363,6 +363,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B3C997EC905A4633C6EA6F3B /* Assets.xcassets in Resources */,
+				72C61F8174E38ED9A7A1E9A9 /* quiet.wav in Resources */,
 				24DA64FC0FAC9E4C4F00F504 /* theme.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -406,7 +407,6 @@
 				BA76BC1A8A10CA9831F2C70D /* PassService.swift in Sources */,
 				B1643E14D012428B3E45243F /* PassbyApp.swift in Sources */,
 				72215AE10BD8EBB02ABD276D /* PeopleSheet.swift in Sources */,
-				4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */,
 				746FCA5B03F917D33D18EBE6 /* PlazaStage.swift in Sources */,
 				A145314F680D91D0272B7514 /* PlazaView.swift in Sources */,
 				9EA5CAF99EA8DBB2F928EB04 /* Secrets.swift in Sources */,
@@ -495,7 +495,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 62GLRR66AN;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -586,7 +586,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 62GLRR66AN;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

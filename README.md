@@ -11,18 +11,23 @@ app; nothing here comes from the games that inspired it.
 ## What is in it
 
 - Onboarding in four steps: name, character, Instagram, Spotify or Steam.
-- A full-screen 3D checkerboard plaza where everyone you have passed walks around.
+- A full-screen 3D checkerboard plaza. Your own character stands in the middle and everyone
+  you have passed walks around you.
 - Three round buttons at the top: your character, people you passed, settings.
 - A bar along the bottom with your numbers: people, passes, and whether passing is on.
-- People in the plaza are solid: they walk round each other, never through, and turn to face
-  where they are going.
-- Pinch to zoom into the plaza; drag to look around while zoomed.
+- People in the plaza are solid and nobody is ever pushed: someone standing stays put, someone
+  walking goes round whoever is in the way, turns before stepping and only steps forwards.
+- The plaza moves like a map: drag to slide it, pinch to zoom, twist two fingers to turn it.
 - "Meet them": new people walk up one at a time with a card showing their name,
   Instagram, three artists, three games and how often you have passed.
 - A Live Activity that shows a green dot and count in the Dynamic Island, plus a green
   outline drawn around the island inside the app.
-- When two phones detect each other, the island opens for 15 seconds with "Time to meet
-  someone new" and, on phones that can tell, an arrow that turns towards the other person.
+- When two phones detect each other, "Time to make a new friend" comes up. Inside the app it
+  is a panel that opens out of the island for 15 seconds, with an arrow that turns towards
+  the other person on phones that can tell. With the app in the background the island keeps
+  the meeting for two minutes and the big island is brought back every five seconds for the
+  first half minute (iOS closes it by itself and an app cannot hold it open). Opening the app
+  during those two minutes shows the panel and the arrow again.
 - Synthesised sounds, a babble voice and a looping background tune.
 
 iPhone only, iOS 17 or later. No server and no accounts.
@@ -51,6 +56,18 @@ tools/install.sh
 The first run registers the bundle IDs `com.passbyplaza.app` and
 `com.passbyplaza.app.live` with the developer team set in `project.yml`
 (`DEVELOPMENT_TEAM`). Change the team or the IDs there if you need to.
+
+## TestFlight
+
+```
+tools/testflight.sh
+```
+
+builds a signed release and uploads it. The app is listed in App Store Connect as
+"Passby Plaza" ("Passby" was taken as a store name; the name under the icon is still
+Passby). Every upload goes automatically to the internal testing group "Team"; testers
+install it from the TestFlight app. Internal testers have to be members of the App Store
+Connect team first (Users and Access), then added to the group.
 
 ## When a test on a real phone goes wrong
 
@@ -101,10 +118,11 @@ Xcode, run `xcodegen` once after adding it.
 ## Layout
 
 ```
-PassbyCore/     logic with unit tests: profile format, pass rules, storage, Steam link parsing
+PassbyCore/     logic with unit tests: profile format, pass rules, storage, Steam link parsing,
+                and the plaza itself (who stands and walks where: PlazaScene, Crowd, PlazaCamera)
 App/Passby/     the app: Draw/ (characters, plaza), UI/, Services/ (Bluetooth, audio, logins)
 App/PassbyLive/ the Live Activity
-tools/          sim.sh, install.sh, make_music.py
+tools/          sim.sh, install.sh, testflight.sh, logs.sh, watch.sh, make_music.py
 docs/           the design, the plan and the approved mockup
 ```
 

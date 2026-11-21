@@ -81,4 +81,53 @@ final class PlazaCameraTests: XCTestCase {
     func testBehindTheCameraHasNoScreenPosition() {
         XCTAssertNil(camera.screen(x: 0, y: 0, z: 1000))
     }
+
+    // MARK: Turning
+
+    func testTurningAboutTheCentreKeepsItAtTheCentre() throws {
+        let centre = try XCTUnwrap(camera.ground(u: 0.5, v: 0.5))
+        let turned = camera.turned(by: 0.7, about: centre)
+        let now = try XCTUnwrap(turned.ground(u: 0.5, v: 0.5))
+        XCTAssertEqual(now.x, centre.x, accuracy: 1e-9)
+        XCTAssertEqual(now.z, centre.z, accuracy: 1e-9)
+        XCTAssertEqual(turned.turn, 0.7, accuracy: 1e-12)
+    }
+
+    func testTurningKeepsTheCameraTheSameDistanceFromThePivot() throws {
+        let centre = try XCTUnwrap(camera.ground(u: 0.5, v: 0.5))
+        let turned = camera.turned(by: -2.1, about: centre)
+        XCTAssertEqual(
+            hypot(turned.x - centre.x, turned.z - centre.z), hypot(camera.x - centre.x, camera.z - centre.z),
+            accuracy: 1e-9)
+    }
+
+    func testAQuarterTurnSwingsTheFarSideRoundToTheRight() throws {
+        let centre = try XCTUnwrap(camera.ground(u: 0.5, v: 0.5))
+        let turned = camera.turned(by: .pi / 2, about: centre)
+        // What was beyond the centre is now level with it, on the right: the floor turned clockwise.
+        let far = try XCTUnwrap(turned.screen(x: centre.x, y: 0, z: centre.z - 3))
+        XCTAssertGreaterThan(far.u, 0.5)
+        XCTAssertEqual(far.v, 0.5, accuracy: 1e-9)
+        // And what was to the left of the centre is now beyond it.
+        let left = try XCTUnwrap(turned.screen(x: centre.x - 3, y: 0, z: centre.z))
+        XCTAssertEqual(left.u, 0.5, accuracy: 1e-9)
+        XCTAssertGreaterThan(left.v, 0.5)
+    }
+
+    func testGroundThenScreenRoundTripsWhenTurnedZoomedAndMoved() throws {
+        let centre = try XCTUnwrap(camera.ground(u: 0.5, v: 0.5))
+        let view = camera.zoomed(by: 1.8).moved(x: 2, z: -3).turned(by: 1.1, about: centre)
+        for (u, v) in [(0.5, 0.5), (0.1, 0.2), (0.9, 0.8), (0.33, 0.71)] {
+            let g = try XCTUnwrap(view.ground(u: u, v: v))
+            let s = try XCTUnwrap(view.screen(x: g.x, y: 0, z: g.z))
+            XCTAssertEqual(s.u, u, accuracy: 1e-9)
+            XCTAssertEqual(s.v, v, accuracy: 1e-9)
+        }
+    }
+
+    func testZoomingAndMovingKeepTheTurn() throws {
+        let turned = camera.turned(by: 0.4, about: (x: 0, z: -30))
+        XCTAssertEqual(turned.zoomed(by: 2).turn, 0.4, accuracy: 1e-12)
+        XCTAssertEqual(turned.moved(x: 1, z: 1).turn, 0.4, accuracy: 1e-12)
+    }
 }

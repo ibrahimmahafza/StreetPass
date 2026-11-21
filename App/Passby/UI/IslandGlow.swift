@@ -29,13 +29,15 @@ struct IslandGlow: View {
     }
 }
 
-/// "Time to meet someone new": the island opening up inside the app for the 15 seconds after a pass.
+/// "Time to make a new friend": the island opening up inside the app for 15 seconds after a pass.
 ///
 /// iOS hides an app's own Live Activity while the app is on screen, so the app draws this itself:
 /// a black panel that grows out of the island, with the person, an arrow that turns towards them
 /// as the phone moves, and a bar that runs down the time.
 struct IslandPopup: View {
     let meeting: AppModel.Meeting
+    /// When the popup closes.
+    let until: Date
     /// Radians to the right of where the phone points, or nil when the phone cannot tell.
     let bearing: Double?
     let distance: Double?
@@ -55,7 +57,7 @@ struct IslandPopup: View {
                         .background(Color.white.opacity(0.14), in: Circle())
                         .clipShape(Circle())
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Time to meet someone new")
+                        Text(PassActivityAttributes.meetingTitle)
                             .font(Theme.font(16, .bold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
@@ -69,7 +71,7 @@ struct IslandPopup: View {
                     Spacer(minLength: 0)
                     pointer
                 }
-                ProgressView(timerInterval: meeting.until.addingTimeInterval(-AppModel.meetingLength)...meeting.until, countsDown: true) {
+                ProgressView(timerInterval: until.addingTimeInterval(-AppModel.popupLength)...until, countsDown: true) {
                     EmptyView()
                 } currentValueLabel: {
                     EmptyView()
@@ -89,7 +91,7 @@ struct IslandPopup: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 10)
         .padding(.top, safeTop >= 51 ? safeTop - 48 : safeTop + 6)
-        .accessibilityLabel("Time to meet someone new. \(detail)")
+        .accessibilityLabel("\(PassActivityAttributes.meetingTitle). \(detail)")
     }
 
     private var detail: String {

@@ -22,6 +22,9 @@ final class NearbyFinder: NSObject {
     @ObservationIgnored var onFix: (() -> Void)?
 
     @ObservationIgnored private var session: NISession?
+    /// The settings for the person being ranged with, kept so ranging can be started again after iOS pauses it.
+    @ObservationIgnored private var peer: NINearbyPeerConfiguration?
+    @ObservationIgnored private var paused = false
     @ObservationIgnored private var demo: Timer?
     @ObservationIgnored private var lastLogged = Date.distantPast
     @ObservationIgnored private var fixes = 0
@@ -75,8 +78,19 @@ final class NearbyFinder: NSObject {
             configuration.isCameraAssistanceEnabled = true
         }
         fixes = 0
+        peer = configuration
+        paused = false
         note("ranging", "started ranging\(configuration.isCameraAssistanceEnabled ? " with the camera's help" : "")")
         session.run(configuration)
+    }
+
+    /// Picks ranging back up with the same person after iOS paused it. A paused session does not
+    /// restart by itself. Does nothing if ranging was never paused.
+    func resume() {
+        guard paused, let session, let peer else { return }
+        paused = false
+        note("ranging", "starting ranging again")
+        session.run(peer)
     }
 
     /// Ends ranging and gets a new token ready for the next person. A token is only good for one session.
@@ -86,6 +100,8 @@ final class NearbyFinder: NSObject {
         if session != nil, fixes > 0 { note("ranging", "stopped after \(fixes) readings") }
         session?.invalidate()
         session = nil
+        peer = nil
+        paused = false
         bearing = nil
         distance = nil
         needsSweep = false
@@ -143,11 +159,22 @@ extension NearbyFinder: NISessionDelegate {
     }
 
     nonisolated func sessionWasSuspended(_ session: NISession) {
-        MainActor.assumeIsolated { note("ranging", "paused by iOS (app not in front)") }
+        MainActor.assumeIsolated {
+            guard session === self.session else { return }
+            note("ranging", "paused by iOS (app not in front)")
+            paused = true
+            bearing = nil
+            distance = nil
+            onFix?()
+        }
     }
 
     nonisolated func sessionSuspensionEnded(_ session: NISession) {
-        MainActor.assumeIsolated { note("ranging", "iOS allows ranging again") }
+        MainActor.assumeIsolated {
+            guard session === self.session else { return }
+            note("ranging", "iOS allows ranging again")
+            resume()
+        }
     }
 
     nonisolated func session(_ session: NISession, didUpdateAlgorithmConvergence convergence: NIAlgorithmConvergence, for object: NINearbyObject?) {
@@ -168,6 +195,8 @@ extension NearbyFinder: NISessionDelegate {
             guard session === self.session else { return }
             note("ranging", "session ended: \(error.localizedDescription)")
             self.session = nil
+            peer = nil
+            paused = false
             bearing = nil
             distance = nil
             needsSweep = false

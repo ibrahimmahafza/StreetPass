@@ -50,7 +50,8 @@ final class PlazaStage {
         plane.firstMaterial = floor
         let ground = SCNNode(geometry: plane)
         ground.eulerAngles.x = -.pi / 2
-        ground.position = SCNVector3(0, 0, -150)
+        // Centred under the middle of the plaza, so there is floor whichever way the view is turned.
+        ground.position = SCNVector3(0, 0, -32)
         ground.renderingOrder = -10
         scene.rootNode.addChildNode(ground)
 
@@ -89,7 +90,9 @@ final class PlazaStage {
     func use(_ camera: PlazaCamera) {
         eye.camera?.fieldOfView = camera.fieldOfView * 180 / .pi
         eye.position = SCNVector3(camera.x, camera.height, camera.z)
-        eye.eulerAngles = SCNVector3(-camera.pitch, 0, 0)
+        // Tilt down first, then swing round the vertical.
+        eye.simdOrientation = simd_quatf(angle: Float(camera.turn), axis: SIMD3(0, 1, 0))
+            * simd_quatf(angle: Float(-camera.pitch), axis: SIMD3(1, 0, 0))
     }
 
     /// Moves, adds and removes models to match the simulation. Called every frame.
@@ -118,8 +121,8 @@ final class PlazaStage {
             guard let node = figure?.node else { continue }
             node.position = SCNVector3(actor.x, 0, actor.z)
             node.eulerAngles.y = Float(actor.heading)
-            Character3D.pose(node, walkPhase: actor.walkPhase, bounce: actor.bounce)
-            Character3D.lookUp(node, by: actor.lookUp)
+            Character3D.pose(node, walkPhase: actor.walkPhase.map { CGFloat($0) }, bounce: CGFloat(actor.bounce))
+            Character3D.lookUp(node, by: Float(actor.lookUp))
         }
 
         ring.isHidden = !state.visible
@@ -150,15 +153,18 @@ final class PlazaStage {
 }
 
 /// The 3D plaza as a SwiftUI view. It steps the simulation and redraws on every screen refresh.
-/// When `onTap` is set it also zooms with a pinch and, once zoomed, slides under a dragging finger.
+/// When `onTap` is set it can also be moved about like a map: drag to slide it, pinch to zoom,
+/// twist two fingers to turn it.
 struct PlazaStageView: UIViewRepresentable {
     let scene: PlazaScene
     var startZoom = 1.0
+    /// Degrees the floor starts turned clockwise.
+    var startTurn = 0.0
     /// Called with the person under a tap, or nil for empty floor.
     var onTap: ((UUID?) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(scene: scene, zoom: startZoom)
+        Coordinator(scene: scene, zoom: startZoom, turn: startTurn * .pi / 180)
     }
 
     func makeUIView(context: Context) -> SCNView {
@@ -172,11 +178,14 @@ struct PlazaStageView: UIViewRepresentable {
         view.isUserInteractionEnabled = onTap != nil
         let pinch = UIPinchGestureRecognizer(target: coordinator, action: #selector(Coordinator.pinched(_:)))
         let drag = UIPanGestureRecognizer(target: coordinator, action: #selector(Coordinator.dragged(_:)))
+        let twist = UIRotationGestureRecognizer(target: coordinator, action: #selector(Coordinator.twisted(_:)))
         pinch.delegate = coordinator
         drag.delegate = coordinator
+        twist.delegate = coordinator
         view.addGestureRecognizer(UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.tapped(_:))))
         view.addGestureRecognizer(pinch)
         view.addGestureRecognizer(drag)
+        view.addGestureRecognizer(twist)
         coordinator.onTap = onTap
         coordinator.start(in: view)
         return view
@@ -202,17 +211,22 @@ struct PlazaStageView: UIViewRepresentable {
         private var last: CFTimeInterval?
         private var aspect = 0.0
         private var zoom: Double
-        /// How far the view has been dragged across the floor while zoomed in.
+        /// Radians the floor has been turned clockwise.
+        private var turn: Double
+        /// How far the middle of the screen has been slid from the centre of the floor, where you stand.
         private var slide = (x: 0.0, z: 0.0)
 
-        /// What is on screen right now: the simulation's camera, zoomed and slid.
+        /// What is on screen right now: the simulation's camera, zoomed, slid and turned.
         private var lens: PlazaCamera {
-            scene.camera.zoomed(by: zoom).moved(x: slide.x, z: slide.z)
+            let home = scene.home
+            return scene.camera.zoomed(by: zoom).moved(x: slide.x, z: slide.z)
+                .turned(by: turn, about: (x: home.x + slide.x, z: home.z + slide.z))
         }
 
-        init(scene: PlazaScene, zoom: Double) {
+        init(scene: PlazaScene, zoom: Double, turn: Double) {
             self.scene = scene
             self.zoom = min(Self.zoomRange.upperBound, max(Self.zoomRange.lowerBound, zoom))
+            self.turn = turn
         }
 
         func start(in view: SCNView) {
@@ -233,10 +247,13 @@ struct PlazaStageView: UIViewRepresentable {
             let now = view.bounds.width / view.bounds.height
             if abs(now - aspect) > 0.0001 {
                 aspect = now
-                // People are always placed through the unzoomed camera, so zooming never moves them.
+                // People are always placed through the plain camera, so moving the view never moves them.
                 scene.camera = PlazaCamera(aspect: now)
             }
+            let lens = lens
             stage.use(lens)
+            // People standing about face wherever the view is looking from.
+            scene.viewer = Spot(x: lens.x, z: lens.z)
             let dt = min(0.05, link.timestamp - (last ?? link.timestamp))
             last = link.timestamp
             scene.step(dt)
@@ -249,8 +266,9 @@ struct PlazaStageView: UIViewRepresentable {
         }
 
         @objc func tapped(_ gesture: UITapGestureRecognizer) {
-            guard let view else { return }
-            onTap?(scene.person(at: gesture.location(in: view), in: view.bounds.size, through: lens))
+            guard let view, view.bounds.width > 0, view.bounds.height > 0 else { return }
+            let point = gesture.location(in: view)
+            onTap?(scene.person(atU: point.x / view.bounds.width, v: 1 - point.y / view.bounds.height, through: lens))
         }
 
         /// Zooms around the fingers: whatever is under them stays under them.
@@ -267,9 +285,9 @@ struct PlazaStageView: UIViewRepresentable {
             keepInBounds()
         }
 
-        /// Slides the floor with the finger. Only once zoomed in; at full view there is nowhere to go.
+        /// Slides the floor with the finger: the spot that was under it stays under it.
         @objc func dragged(_ gesture: UIPanGestureRecognizer) {
-            guard let view, zoom > 1.01, gesture.state == .changed else { return }
+            guard let view, gesture.state == .changed else { return }
             let now = gesture.location(in: view)
             let moved = gesture.translation(in: view)
             gesture.setTranslation(.zero, in: view)
@@ -280,11 +298,24 @@ struct PlazaStageView: UIViewRepresentable {
             keepInBounds()
         }
 
-        /// The further in, the further the view may slide; zoomed all the way out it sits where it started.
+        /// Turns the floor with two twisting fingers, about the spot between them.
+        @objc func twisted(_ gesture: UIRotationGestureRecognizer) {
+            guard let view, gesture.state == .began || gesture.state == .changed else { return }
+            let point = gesture.location(in: view)
+            let before = ground(under: point)
+            turn = Crowd.turn(from: 0, to: turn + Double(gesture.rotation))
+            gesture.rotation = 0
+            if let before, let after = ground(under: point) {
+                slide.x += before.x - after.x
+                slide.z += before.z - after.z
+            }
+            keepInBounds()
+        }
+
+        /// The view can slide as far as the edges of the crowd and the ring, and no further.
         private func keepInBounds() {
-            let room = 1 - 1 / zoom
-            slide.x = max(-16 * room, min(16 * room, slide.x))
-            slide.z = max(-42 * room, min(14 * room, slide.z))
+            slide.x = max(-7, min(7, slide.x))
+            slide.z = max(-16, min(9, slide.z))
         }
 
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
@@ -297,10 +328,11 @@ struct PlazaStageView: UIViewRepresentable {
 struct PlazaBackdrop: View {
     let scene: PlazaScene
     var startZoom = 1.0
+    var startTurn = 0.0
     var onTap: ((UUID?) -> Void)?
 
     var body: some View {
-        PlazaStageView(scene: scene, startZoom: startZoom, onTap: onTap)
+        PlazaStageView(scene: scene, startZoom: startZoom, startTurn: startTurn, onTap: onTap)
             .accessibilityHidden(true)
     }
 }

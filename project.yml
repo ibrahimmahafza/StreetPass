@@ -10,7 +10,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     TARGETED_DEVICE_FAMILY: "1"
 packages:
   PassbyCore:
@@ -38,6 +38,7 @@ targets:
         NSCameraUsageDescription: On some iPhones, Passby uses the camera to work out which way a nearby person is. Nothing is recorded or saved.
         UIBackgroundModes: [bluetooth-central, bluetooth-peripheral, nearby-interaction]
         NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
           - CFBundleURLName: com.passbyplaza.app

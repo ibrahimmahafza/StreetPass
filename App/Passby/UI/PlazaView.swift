@@ -1,8 +1,8 @@
 import PassbyCore
 import SwiftUI
 
-/// The main screen: the plaza fills it, three round buttons float at the top and a bar of
-/// numbers sits along the bottom. Pinch to zoom.
+/// The main screen: the plaza fills it with your character in the middle, three round buttons float
+/// at the top and a bar of numbers sits along the bottom. Drag, pinch and twist to move the view.
 struct PlazaView: View {
     @Environment(AppModel.self) private var model
     @State private var scene = PlazaScene()
@@ -31,9 +31,9 @@ struct PlazaView: View {
                         .frame(maxHeight: .infinity, alignment: .bottom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                if let meeting = model.meeting, meeting.until > Date() {
+                if let meeting = model.meeting, let until = model.popupUntil, until > Date() {
                     IslandPopup(
-                        meeting: meeting, bearing: model.finder.bearing, distance: model.finder.distance,
+                        meeting: meeting, until: until, bearing: model.finder.bearing, distance: model.finder.distance,
                         needsSweep: model.finder.needsSweep, safeTop: geo.safeAreaInsets.top
                     ) {
                         // Tapping the announcement goes straight to meeting them.
@@ -45,21 +45,25 @@ struct PlazaView: View {
                     .zIndex(10)
                 }
             }
-            .animation(.spring(duration: 0.45), value: model.meeting)
+            .animation(.spring(duration: 0.45), value: model.popupUntil)
         }
         .onAppear {
+            scene.me = model.state.me?.look
             scene.sync(model.state.encounters)
             openDemoScreen()
         }
         .onChange(of: model.state.encounters) { _, encounters in
             scene.sync(encounters)
         }
+        .onChange(of: model.state.me?.look) { _, look in
+            scene.me = look
+        }
     }
 
     // MARK: Layers
 
     private var floor: some View {
-        PlazaBackdrop(scene: scene, startZoom: model.demoZoom) { id in tapped(id) }
+        PlazaBackdrop(scene: scene, startZoom: model.demoZoom, startTurn: model.demoTurn) { id in tapped(id) }
             .ignoresSafeArea()
     }
 
@@ -170,15 +174,21 @@ struct PlazaView: View {
         queue = ids
         if !instantly { model.audio.jingle() }
         scene.beginArrival(ids, instantly: instantly) {
-            scene.talking = ids[0]
-            withAnimation(.snappy(duration: 0.3)) { sheet = .card(ids[0], arriving: true) }
+            // Called from inside a frame of the plaza; let that finish before the screen changes.
+            DispatchQueue.main.async {
+                scene.talking = ids[0]
+                withAnimation(.snappy(duration: 0.3)) { sheet = .card(ids[0], arriving: true) }
+            }
         }
     }
 
     private func tapped(_ id: UUID?) {
-        guard sheet == nil, !arriving, let id,
-              let encounter = model.state.encounters.first(where: { $0.id == id })
-        else { return }
+        guard sheet == nil, !arriving, let id else { return }
+        if id == scene.meID {
+            open(.me)
+            return
+        }
+        guard let encounter = model.state.encounters.first(where: { $0.id == id }) else { return }
         if encounter.waiting {
             meet()
         } else {

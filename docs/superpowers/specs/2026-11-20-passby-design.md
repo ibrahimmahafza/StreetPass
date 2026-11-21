@@ -134,3 +134,41 @@ Achraf handed the how to Claude; approach 1 is Claude's pick.
   an app's own Live Activity while it is on screen). With the app in the background, the Live
   Activity is updated with an alert, and its meeting state expires through a stale date.
 
+## Changes after the first test on two phones (2026-11-21)
+
+Achraf and a friend installed build 1 from TestFlight. Bluetooth passing worked ("you pretty
+much nailed the bluetooth thing"). He asked for five changes.
+
+- **Collisions.** "You need to fix the collision physics." In build 1 people were pushed apart
+  when they overlapped, so someone standing could be slid across the floor by a walker. Now
+  nobody is ever pushed. Someone standing stays exactly where they are; someone walking stops at
+  whoever is in the way, picks a side and goes round, turns before stepping and only steps the
+  way they face. The rules are `Crowd` in PassbyCore, and `PlazaScene` moved into PassbyCore so
+  its tests can check every frame that nobody standing moved, no step was sideways or backwards,
+  and no two people overlapped.
+- **Your character in the middle.** "One's mii should always be at the center of the
+  chessboard." Your own character now stands at the centre of the floor and never wanders.
+  Nobody stops to stand within 3.7 floor units of you, and people who walk up to say hello
+  gather beside you and face you while you turn to whoever is talking. The clear space and the
+  greeting places are Claude's calls. Tapping your character opens the character sheet.
+- **Moving the view.** "We should be able to not just zoom." He did not say what else, so this
+  is Claude's reading: the plaza moves like a map. Drag slides it (at any zoom now), pinch
+  zooms, and twisting two fingers turns it. People standing about face wherever the view is.
+- **Title.** "Time to meet someone new" became "Time to make a new friend".
+- **The island with the app in the background.** He asked that it "point to that person you
+  just met's phone" and that "the big dynamic island in background mode should run for way
+  longer". What was done, and what cannot be:
+  - The meeting now lasts two minutes on the island (15 seconds before). The panel inside the
+    app still lasts 15 seconds, and comes back when the app is opened during the two minutes.
+  - iOS closes the big island a few seconds after an announcement and gives apps no way to keep
+    it open. The announcement is therefore repeated silently five times, five seconds apart, so
+    the big island keeps coming back for about half a minute. Both numbers are Claude's.
+  - A paused ranging session does not restart by itself; the app now restarts it when iOS allows
+    ranging again and when the app is opened.
+  - Direction between two phones comes from the Ultra Wideband chip alone only on older iPhones
+    (reports say 11 to 13). Later ones, including Achraf's iPhone 16, need the camera's help,
+    and the camera cannot run in the background. So on those phones the island can show how far
+    away the person is but not an arrow, until the app is opened. Whether iOS delivers ranging to
+    an app in the background at all is barely documented (iOS 18.4 added it for apps with an
+    active Live Activity); the app logs whether it happens.
+
