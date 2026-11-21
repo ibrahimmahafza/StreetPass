@@ -8,17 +8,22 @@
 
 /* Begin PBXBuildFile section */
 		1F5E82ABA44348CAB8472A73 /* CharacterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B52AED78A3B66CFEE78147 /* CharacterRenderer.swift */; };
+		4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813D2F48030F4942002B6502 /* PlazaScene.swift */; };
 		4C5D29241379F654B3EA2762 /* CharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */; };
 		54D8F3EA383B8E1B59F5E724 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
 		57C1F6F61B63A15A72616C6E /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E6C67ED9841916C98FCFFE /* Palette.swift */; };
 		5DD5BA1017E979ED5CE778E8 /* PassbyLive.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8A0DC52099855A0C74C2D8B7 /* PassbyLive.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		62CBE7025E13B6059992B414 /* PassActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD65C5E8045F4EDF79FF36D /* PassActivityWidget.swift */; };
+		659D2262DB2DD6D87772AAEC /* CardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF1DE083A04E05B00D2516E /* CardSheet.swift */; };
 		8B316175669E70EDA5350EC4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 493DFDA6E1444F36289A94EE /* WidgetKit.framework */; };
 		949370D4B026C8B530DC6B78 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
 		9AD25B706D62B53F7C629B1B /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDC46C899DBE15C46567A41F /* AppModel.swift */; };
+		A145314F680D91D0272B7514 /* PlazaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67C35170628CEB552A9B062 /* PlazaView.swift */; };
 		B1643E14D012428B3E45243F /* PassbyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B931FBA4E55E2845E1BDA5 /* PassbyApp.swift */; };
 		BE3D984F9EADDA0ED9A24B63 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B50B1BDB63F8C14B0E3E6A /* GalleryView.swift */; };
 		BEE73B03B4BD6E1BB5CBBB3E /* PassbyLiveBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A924A77B769F9C6CE0DFB0F5 /* PassbyLiveBundle.swift */; };
+		C27C824C94457BE64ECCD82E /* BottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED812E7FF4D7AE4B6A252A98 /* BottomSheet.swift */; };
+		C8293EDF7B32733B70CFE3F1 /* IslandGlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57619FF182C1F63A465B3954 /* IslandGlow.swift */; };
 		C9C6CDF76EB587E02620FAE3 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 583F0A466DDA962889DACBFA /* SwiftUI.framework */; };
 		CA197B815E6FE307F775658B /* PassbyCore in Frameworks */ = {isa = PBXBuildFile; productRef = F6E6FE40B6730E316DBB6A37 /* PassbyCore */; };
 		F353A8F8C5BFA9A9C2AE143B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAC5C3E19217C60D99C35A40 /* Theme.swift */; };
@@ -56,8 +61,11 @@
 		4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterView.swift; sourceTree = "<group>"; };
 		4D3CFF7BD6B004C0E18222F3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassActivityAttributes.swift; sourceTree = "<group>"; };
+		57619FF182C1F63A465B3954 /* IslandGlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandGlow.swift; sourceTree = "<group>"; };
 		583F0A466DDA962889DACBFA /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		813D2F48030F4942002B6502 /* PlazaScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaScene.swift; sourceTree = "<group>"; };
 		8A0DC52099855A0C74C2D8B7 /* PassbyLive.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PassbyLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9FF1DE083A04E05B00D2516E /* CardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSheet.swift; sourceTree = "<group>"; };
 		A924A77B769F9C6CE0DFB0F5 /* PassbyLiveBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassbyLiveBundle.swift; sourceTree = "<group>"; };
 		AAC5C3E19217C60D99C35A40 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		B8044A4A113B62551DAF2991 /* Passby.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Passby.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -65,7 +73,9 @@
 		C1FFDDB0B85DDA3CFAE55885 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C5E6C67ED9841916C98FCFFE /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		E0B931FBA4E55E2845E1BDA5 /* PassbyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassbyApp.swift; sourceTree = "<group>"; };
+		ED812E7FF4D7AE4B6A252A98 /* BottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheet.swift; sourceTree = "<group>"; };
 		F4B50B1BDB63F8C14B0E3E6A /* GalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryView.swift; sourceTree = "<group>"; };
+		F67C35170628CEB552A9B062 /* PlazaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,8 +102,12 @@
 		13F1386E711911717C2F1156 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				ED812E7FF4D7AE4B6A252A98 /* BottomSheet.swift */,
+				9FF1DE083A04E05B00D2516E /* CardSheet.swift */,
 				4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */,
 				F4B50B1BDB63F8C14B0E3E6A /* GalleryView.swift */,
+				57619FF182C1F63A465B3954 /* IslandGlow.swift */,
+				F67C35170628CEB552A9B062 /* PlazaView.swift */,
 				AAC5C3E19217C60D99C35A40 /* Theme.swift */,
 			);
 			path = UI;
@@ -145,6 +159,7 @@
 			children = (
 				18B52AED78A3B66CFEE78147 /* CharacterRenderer.swift */,
 				C5E6C67ED9841916C98FCFFE /* Palette.swift */,
+				813D2F48030F4942002B6502 /* PlazaScene.swift */,
 			);
 			path = Draw;
 			sourceTree = "<group>";
@@ -284,12 +299,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				9AD25B706D62B53F7C629B1B /* AppModel.swift in Sources */,
+				C27C824C94457BE64ECCD82E /* BottomSheet.swift in Sources */,
+				659D2262DB2DD6D87772AAEC /* CardSheet.swift in Sources */,
 				1F5E82ABA44348CAB8472A73 /* CharacterRenderer.swift in Sources */,
 				4C5D29241379F654B3EA2762 /* CharacterView.swift in Sources */,
 				BE3D984F9EADDA0ED9A24B63 /* GalleryView.swift in Sources */,
+				C8293EDF7B32733B70CFE3F1 /* IslandGlow.swift in Sources */,
 				57C1F6F61B63A15A72616C6E /* Palette.swift in Sources */,
 				949370D4B026C8B530DC6B78 /* PassActivityAttributes.swift in Sources */,
 				B1643E14D012428B3E45243F /* PassbyApp.swift in Sources */,
+				4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */,
+				A145314F680D91D0272B7514 /* PlazaView.swift in Sources */,
 				F353A8F8C5BFA9A9C2AE143B /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

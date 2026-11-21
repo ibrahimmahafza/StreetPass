@@ -18,8 +18,10 @@ struct RootView: View {
     var body: some View {
         if model.demo == "gallery" {
             GalleryView()
-        } else {
+        } else if model.state.me == nil {
             Text("Passby")
+        } else {
+            PlazaView()
         }
     }
 }
