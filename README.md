@@ -21,6 +21,8 @@ app; nothing here comes from the games that inspired it.
   Instagram, three artists, three games and how often you have passed.
 - A Live Activity that shows a green dot and count in the Dynamic Island, plus a green
   outline drawn around the island inside the app.
+- When two phones detect each other, the island opens for 15 seconds with "Time to meet
+  someone new" and, on phones that can tell, an arrow that turns towards the other person.
 - Synthesised sounds, a babble voice and a looping background tune.
 
 iPhone only, iOS 17 or later. No server and no accounts.
@@ -60,6 +62,13 @@ The first run registers the bundle IDs `com.passbyplaza.app` and
 
 If Bluetooth misbehaves on stage, Settings, "Simulate a pass" does the same thing
 with a made-up person.
+
+The arrow comes from the Ultra Wideband chip (Apple's Nearby Interaction), not from
+Bluetooth, which cannot tell direction. It needs the app open on both phones, and the
+first time it asks for permission to find nearby devices, and on some iPhones for the
+camera, which it uses to work out direction. Do one pass before the demo to get those
+prompts out of the way. Without a direction the popup still appears, with the distance
+or just "close by".
 
 Two phones that stay near each other count as one pass. Someone counts again only
 after ten minutes out of range. If you rehearsed with the same phones, press

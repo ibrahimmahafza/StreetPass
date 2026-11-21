@@ -3,8 +3,10 @@ import PassbyCore
 
 /// Notices other phones running Passby and swaps profiles with them over Bluetooth.
 ///
-/// Each phone does both jobs: it advertises a service whose one characteristic holds its own
-/// profile, and it scans for that service on other phones, connects, reads the profile and hangs up.
+/// Each phone does both jobs: it advertises a service that holds its own profile, and it scans for
+/// that service on other phones, connects, reads the profile and hangs up. A second value on the
+/// same service is a token for Ultra Wideband ranging, which is how the phones find each other's
+/// direction afterwards.
 @MainActor
 final class PassService: NSObject {
     enum Status: Equatable {
@@ -13,17 +15,22 @@ final class PassService: NSObject {
 
     nonisolated(unsafe) static let serviceID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0001")
     nonisolated(unsafe) static let profileID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0002")
+    nonisolated(unsafe) static let tokenID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0003")
 
     private(set) var status = Status.off {
         didSet { if status != oldValue { onStatus?(status) } }
     }
 
-    var onProfile: ((Profile) -> Void)?
+    /// Called with someone's profile and, when their phone can range, their ranging token.
+    var onProfile: ((Profile, Data?) -> Void)?
     var onStatus: ((Status) -> Void)?
 
     private var central: CBCentralManager?
     private var peripheral: CBPeripheralManager?
     private var payload = Data()
+    private var token = Data()
+    /// Profiles already read from phones whose token is still being read.
+    private var pending: [UUID: Profile] = [:]
     /// Phones we are talking to right now. Core Bluetooth drops a peripheral nobody holds on to.
     private var talking: [UUID: CBPeripheral] = [:]
     private var lastSeen: [UUID: Date] = [:]
@@ -51,6 +58,11 @@ final class PassService: NSObject {
         payload = profile.wireData()
     }
 
+    /// Sets the ranging token other phones read from this one. Nil when this phone cannot range.
+    func update(token: Data?) {
+        self.token = token ?? Data()
+    }
+
     func stop() {
         rescan?.invalidate()
         rescan = nil
@@ -65,6 +77,7 @@ final class PassService: NSObject {
         talking = [:]
         lastSeen = [:]
         answered = []
+        pending = [:]
         central = nil
         peripheral = nil
         status = .off
@@ -92,8 +105,9 @@ final class PassService: NSObject {
         guard let peripheral, peripheral.state == .poweredOn else { return }
         peripheral.removeAllServices()
         let profile = CBMutableCharacteristic(type: Self.profileID, properties: [.read], value: nil, permissions: [.readable])
+        let token = CBMutableCharacteristic(type: Self.tokenID, properties: [.read], value: nil, permissions: [.readable])
         let service = CBMutableService(type: Self.serviceID, primary: true)
-        service.characteristics = [profile]
+        service.characteristics = [profile, token]
         peripheral.add(service)
     }
 }
@@ -159,6 +173,12 @@ extension PassService: CBCentralManagerDelegate, CBPeripheralDelegate {
         MainActor.assumeIsolated {
             let id = device.identifier
             talking[id] = nil
+            // The link dropped after the profile but before the token: the pass still counts.
+            if let profile = pending.removeValue(forKey: id) {
+                onProfile?(profile, nil)
+                answered.insert(id)
+                lastSeen[id] = Date()
+            }
             // A link that dropped before the profile was read is worth another go straight away.
             if answered.remove(id) == nil { retrySoon(id) }
         }
@@ -167,7 +187,7 @@ extension PassService: CBCentralManagerDelegate, CBPeripheralDelegate {
     nonisolated func peripheral(_ device: CBPeripheral, didDiscoverServices error: Error?) {
         MainActor.assumeIsolated {
             guard let service = device.services?.first(where: { $0.uuid == Self.serviceID }) else { return hangUp(device) }
-            device.discoverCharacteristics([Self.profileID], for: service)
+            device.discoverCharacteristics([Self.profileID, Self.tokenID], for: service)
         }
     }
 
@@ -180,9 +200,21 @@ extension PassService: CBCentralManagerDelegate, CBPeripheralDelegate {
 
     nonisolated func peripheral(_ device: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         MainActor.assumeIsolated {
-            // Anything that is not a Passby profile decodes to nil and is dropped.
-            if characteristic.uuid == Self.profileID, let data = characteristic.value, let profile = Profile(wireData: data) {
-                onProfile?(profile)
+            let id = device.identifier
+            if characteristic.uuid == Self.profileID {
+                // Anything that is not a Passby profile decodes to nil and is dropped.
+                if let data = characteristic.value, let profile = Profile(wireData: data) {
+                    // A phone that can range also offers a token. Read it before reporting the pass.
+                    if let offer = characteristic.service?.characteristics?.first(where: { $0.uuid == Self.tokenID }) {
+                        pending[id] = profile
+                        device.readValue(for: offer)
+                        return
+                    }
+                    onProfile?(profile, nil)
+                }
+            } else if characteristic.uuid == Self.tokenID, let profile = pending.removeValue(forKey: id) {
+                let value = error == nil ? characteristic.value : nil
+                onProfile?(profile, value?.isEmpty == false ? value : nil)
             }
             answered.insert(device.identifier)
             lastSeen[device.identifier] = Date()
@@ -208,13 +240,16 @@ extension PassService: CBPeripheralManagerDelegate {
 
     nonisolated func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
         MainActor.assumeIsolated {
-            guard request.characteristic.uuid == Self.profileID else {
-                return peripheral.respond(to: request, withResult: .attributeNotFound)
+            let value: Data
+            switch request.characteristic.uuid {
+            case Self.profileID: value = payload
+            case Self.tokenID: value = token
+            default: return peripheral.respond(to: request, withResult: .attributeNotFound)
             }
-            guard request.offset <= payload.count else {
+            guard request.offset <= value.count else {
                 return peripheral.respond(to: request, withResult: .invalidOffset)
             }
-            request.value = payload.subdata(in: request.offset..<payload.count)
+            request.value = value.subdata(in: request.offset..<value.count)
             peripheral.respond(to: request, withResult: .success)
         }
     }

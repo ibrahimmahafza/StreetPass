@@ -31,7 +31,21 @@ struct PlazaView: View {
                         .frame(maxHeight: .infinity, alignment: .bottom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                if let meeting = model.meeting, meeting.until > Date() {
+                    IslandPopup(
+                        meeting: meeting, bearing: model.finder.bearing, distance: model.finder.distance,
+                        needsSweep: model.finder.needsSweep, safeTop: geo.safeAreaInsets.top
+                    ) {
+                        // Tapping the announcement goes straight to meeting them.
+                        if sheet == nil { meet() }
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea()
+                    .transition(.scale(scale: 0.3, anchor: .top).combined(with: .opacity))
+                    .zIndex(10)
+                }
             }
+            .animation(.spring(duration: 0.45), value: model.meeting)
         }
         .onAppear {
             scene.sync(model.state.encounters)

@@ -35,12 +35,17 @@
 	<false/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Passby uses Bluetooth to notice other people with the app when you walk past them.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>On some iPhones, Passby uses the camera to work out which way a nearby person is. Nothing is recorded or saved.</string>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Passby uses this to point you towards someone you have just passed.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
 		<string>bluetooth-peripheral</string>
+		<string>nearby-interaction</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

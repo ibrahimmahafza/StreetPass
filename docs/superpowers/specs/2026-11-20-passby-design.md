@@ -126,3 +126,11 @@ Achraf handed the how to Claude; approach 1 is Claude's pick.
   Claude's call for what it should hold. Pinch zooms up to three times around the fingers; a
   drag slides the view while zoomed. People are always placed through the unzoomed camera, so
   zooming never moves them.
+- **"Time to meet someone new".** Achraf asked that when two phones detect each other the
+  Dynamic Island pops up with that line and an arrow towards the other person that updates
+  live like a compass, for 15 seconds. Bluetooth has no sense of direction, so the phones swap
+  a ranging token during the Bluetooth exchange and range each other with the Ultra Wideband
+  chip (`NearbyFinder`). With the app open, the app draws the island opening itself (iOS hides
+  an app's own Live Activity while it is on screen). With the app in the background, the Live
+  Activity is updated with an alert, and its meeting state expires through a stale date.
+

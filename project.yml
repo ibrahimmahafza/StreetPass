@@ -34,7 +34,9 @@ targets:
         UIUserInterfaceStyle: Light
         UIRequiresFullScreen: true
         NSBluetoothAlwaysUsageDescription: Passby uses Bluetooth to notice other people with the app when you walk past them.
-        UIBackgroundModes: [bluetooth-central, bluetooth-peripheral]
+        NSNearbyInteractionUsageDescription: Passby uses this to point you towards someone you have just passed.
+        NSCameraUsageDescription: On some iPhones, Passby uses the camera to work out which way a nearby person is. Nothing is recorded or saved.
+        UIBackgroundModes: [bluetooth-central, bluetooth-peripheral, nearby-interaction]
         NSSupportsLiveActivities: true
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:

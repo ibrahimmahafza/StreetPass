@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PassbyCore
+import UIKit
 
 /// The app's state and the one place that changes it.
 @MainActor @Observable
@@ -23,10 +24,29 @@ final class AppModel {
     let demoZoom: Double
     /// Passes to simulate right after launch, requested with `-simulate <n>`.
     @ObservationIgnored private var pendingPasses: Int
+    /// Seconds to wait before those passes, requested with `-after <s>`, to try them with the app in the background.
+    @ObservationIgnored private let pendingDelay: Double
     @ObservationIgnored private var audioCheck = false
 
     /// Whether Bluetooth passing is working, for Settings.
     private(set) var passStatus = PassService.Status.off
+
+    /// Someone whose phone was detected moments ago.
+    struct Meeting: Equatable {
+        let id: UUID
+        let name: String
+        let look: Look
+        let until: Date
+    }
+
+    /// Set for the 15 seconds after a pass, while the app says "Time to meet someone new".
+    private(set) var meeting: Meeting?
+    static let meetingLength: TimeInterval = 15
+
+    /// Where the person being met is, when the phone can tell.
+    @ObservationIgnored let finder = NearbyFinder()
+    @ObservationIgnored private var meetingEnd: Task<Void, Never>?
+    @ObservationIgnored private var lastPointed = Date.distantPast
 
     @ObservationIgnored let audio = Audio()
     @ObservationIgnored private let pass = PassService()
@@ -45,13 +65,16 @@ final class AppModel {
         demoLink = value("-link")
         demoZoom = value("-zoom").flatMap { Double($0) } ?? 1
         pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
+        pendingDelay = value("-after").flatMap { Double($0) } ?? 0
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }
         try? store.save(state)
         audio.muted = arguments.contains("-mute")
         audioCheck = arguments.contains("-audiocheck")
-        pass.onProfile = { [weak self] profile in self?.handlePass(profile) }
+        pass.onProfile = { [weak self] profile, token in self?.handlePass(profile, token: token) }
         pass.onStatus = { [weak self] status in self?.passStatus = status }
+        finder.onToken = { [weak self] token in self?.pass.update(token: token) }
+        finder.onFix = { [weak self] in self?.pointIsland() }
         applySettings()
     }
 
@@ -61,15 +84,32 @@ final class AppModel {
         if let me = state.me, state.passingOn {
             pass.start(profile: me)
             pass.update(profile: me)
+            finder.prepare()
         } else {
             pass.stop()
         }
         syncIsland()
     }
 
-    /// The green outline follows the number of people waiting.
-    private func syncIsland() {
-        live.sync(waiting: state.waiting.count, wanted: state.me != nil && state.passingOn, canStart: onScreen)
+    /// The green outline follows the number of people waiting, and during a meeting the island
+    /// names the person. With `alert` it opens up to announce them.
+    private func syncIsland(alert: Bool = false) {
+        // The island is hidden while the app is on screen, so direction is only sent to it otherwise.
+        let meet = meeting.map {
+            LiveActivityController.Meet(
+                name: $0.name, until: $0.until,
+                bearing: onScreen ? nil : finder.bearing, distance: onScreen ? nil : finder.distance)
+        }
+        live.sync(
+            waiting: state.waiting.count, wanted: state.me != nil && state.passingOn, canStart: onScreen,
+            meeting: meet, alert: alert)
+    }
+
+    /// Turns the island's arrow as new directions arrive, at most once a second.
+    private func pointIsland() {
+        guard meeting != nil, !onScreen, Date().timeIntervalSince(lastPointed) >= 1 else { return }
+        lastPointed = Date()
+        syncIsland()
     }
 
     /// The app came to the front or left it.
@@ -82,6 +122,10 @@ final class AppModel {
         }
         audio.setForeground(active)
         onScreen = active
+        // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
+        if active, let meeting, meeting.until <= Date() {
+            endMeeting()
+        }
         syncIsland()
     }
 
@@ -93,8 +137,20 @@ final class AppModel {
 
     /// Runs once the first screen is up.
     func afterLaunch() {
-        for _ in 0..<pendingPasses { simulatePass() }
+        let passes = pendingPasses
         pendingPasses = 0
+        if demo == "meet" {
+            simulatePass()
+            finder.demoSweep()
+        }
+        guard passes > 0 else { return }
+        Task {
+            // Ask iOS to keep the app alive through the wait, so the pass can arrive with the app in the background.
+            let keepAlive = UIApplication.shared.beginBackgroundTask()
+            if pendingDelay > 0 { try? await Task.sleep(for: .seconds(pendingDelay)) }
+            for _ in 0..<passes { simulatePass() }
+            UIApplication.shared.endBackgroundTask(keepAlive)
+        }
     }
 
     // MARK: You
@@ -152,10 +208,37 @@ final class AppModel {
 
     // MARK: Passing
 
-    func handlePass(_ profile: Profile) {
-        if state.recordPass(profile, at: Date()) != .ignored {
-            audio.jingle()
+    /// A phone running the app was just detected. `token` lets this phone range with it, if both can.
+    func handlePass(_ profile: Profile, token: Data? = nil) {
+        // Someone seen again inside the cooldown is not a new pass, so nothing is announced.
+        guard state.recordPass(profile, at: Date()) != .ignored else { return }
+        audio.jingle()
+        beginMeeting(with: profile, token: token)
+    }
+
+    /// Starts the 15 seconds of "Time to meet someone new": the popup in the app, the announcement on
+    /// the island, and ranging so an arrow can point at them.
+    private func beginMeeting(with profile: Profile, token: Data?) {
+        meetingEnd?.cancel()
+        meeting = Meeting(
+            id: profile.id, name: profile.name, look: profile.look,
+            until: Date().addingTimeInterval(Self.meetingLength))
+        if let token { finder.find(peer: token) }
+        syncIsland(alert: true)
+        meetingEnd = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.meetingLength))
+            guard !Task.isCancelled else { return }
+            self?.endMeeting()
         }
+    }
+
+    func endMeeting() {
+        meetingEnd?.cancel()
+        meetingEnd = nil
+        guard meeting != nil else { return }
+        meeting = nil
+        finder.stop()
+        syncIsland()
     }
 
     func greet(_ id: UUID) {
@@ -209,7 +292,7 @@ final class AppModel {
                 s.encounters[j].times = Int.random(in: 1...6, using: &rng)
             }
         }
-        if !["plaza", "gallery", "icon"].contains(demo) {
+        if !["plaza", "gallery", "icon", "meet"].contains(demo) {
             var lina = demoProfile(named: "Lina")
             lina.look = Look(skin: 2, hair: 3, hairColor: 1, eyes: 0, mouth: 0, hoodie: 7, extra: 0)
             lina.instagram = "lina.mtl"
