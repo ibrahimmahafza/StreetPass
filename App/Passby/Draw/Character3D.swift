@@ -9,7 +9,7 @@ import UIKit
 enum Character3D {
     /// Node names used by `pose`.
     private enum Part {
-        static let body = "body", shape = "shape", legLeft = "legL", legRight = "legR"
+        static let body = "body", shape = "shape", legLeft = "legL", legRight = "legR", head = "head"
     }
 
     static func make(_ rawLook: Look) -> SCNNode {
@@ -46,24 +46,37 @@ enum Character3D {
             put(SCNCapsule(capRadius: 0.55, height: 7), RGB(0xFFFFFF), s * 2.8, 58.4, 7.7, in: body)
         }
 
-        // Head: the egg, ears, and the sketched face laid over its front.
+        // Head: the egg, ears, and the sketched face laid over its front. Everything above the neck
+        // hangs from one node that pivots at the neck, so the head can tilt.
+        let neck = SCNNode()
+        neck.name = Part.head
+        neck.pivot = SCNMatrix4MakeTranslation(0, Float(neckHeight), 0)
+        neck.position = SCNVector3(0, neckHeight, 0)
+        body.addChildNode(neck)
         let head = SCNNode(geometry: Egg.shell.copy() as? SCNGeometry)
         head.geometry?.firstMaterial = material(skin)
         head.position = SCNVector3(0, Egg.centre, 0)
         head.scale = SCNVector3(1, 1, Egg.flatten)
-        body.addChildNode(head)
+        neck.addChildNode(head)
         let earX = Egg.radius(at: 81)
         for s: CGFloat in [-1, 1] {
-            put(SCNSphere(radius: 3.6), skin.mix(-0.05), s * earX, 81, 0, in: body).scale = SCNVector3(0.6, 1, 0.9)
+            put(SCNSphere(radius: 3.6), skin.mix(-0.05), s * earX, 81, 0, in: neck).scale = SCNVector3(0.6, 1, 0.9)
         }
         let face = SCNNode(geometry: Egg.facePatch.copy() as? SCNGeometry)
         face.geometry?.firstMaterial = Sketch.material(eyes: look.eyes, mouth: look.mouth, brow: hair.mix(-0.4), darkSkin: look.skin >= 4)
         face.renderingOrder = 1
-        body.addChildNode(face)
+        neck.addChildNode(face)
 
-        addHair(look.hair, hair, skin: skin, to: body)
-        addExtra(look.extra, top: top, to: body)
+        addHair(look.hair, hair, skin: skin, to: neck)
+        addExtra(look.extra, top: top, to: neck)
         return root
+    }
+
+    private static let neckHeight: CGFloat = 66
+
+    /// Tips the head back by `angle` radians so the face looks up, towards a camera above.
+    static func lookUp(_ node: SCNNode, by angle: Float) {
+        node.childNode(withName: Part.head, recursively: true)?.eulerAngles.x = -angle
     }
 
     /// Steps the body through its walk, or lifts it for an idle bounce.

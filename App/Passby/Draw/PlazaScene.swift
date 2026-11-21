@@ -11,7 +11,7 @@ final class PlazaScene {
         let look: Look
         var x: Double
         var z: Double
-        /// Radians about the vertical axis; 0 faces the viewer.
+        /// Radians about the vertical axis; 0 faces straight out of the screen.
         var heading: Double
         var walkPhase: CGFloat?
         var bounce: CGFloat
@@ -44,15 +44,15 @@ final class PlazaScene {
     }
 
     /// Height of a character in floor units.
-    static let characterHeight = 2.3
-    private static let ringRadius = 3.1
+    static let characterHeight = 2.9
+    private static let ringRadius = 3.8
     private static let walkSpeed = 1.9
     private static let arrivalSpeed = 9.0
 
     // Where things sit on screen, as fractions: u across, v up from the bottom.
     private static let crowdU = 0.10...0.90
-    private static let crowdV = 0.27...0.67
-    private static let ringV = 0.78
+    private static let crowdV = 0.27...0.65
+    private static let ringV = 0.755
     private static let greetV = 0.585
 
     /// The camera the stage is using. People are placed by where they will appear through it.
@@ -105,7 +105,6 @@ final class PlazaScene {
             if instantly {
                 walkers[i].x = spot.x
                 walkers[i].z = spot.z
-                walkers[i].heading = 0
                 walkers[i].mode = .arrived
                 walkers[i].moving = false
             } else {
@@ -161,9 +160,8 @@ final class PlazaScene {
         for (slot, i) in waiting.enumerated() {
             let row = slot / 3
             let inRow = min(3, waiting.count - row * 3)
-            walkers[i].x = centre.x + (Double(slot % 3) - Double(inRow - 1) / 2) * 1.9
-            walkers[i].z = centre.z - 0.6 + Double(row) * 1.5
-            walkers[i].heading = 0
+            walkers[i].x = centre.x + (Double(slot % 3) - Double(inRow - 1) / 2) * 2.4
+            walkers[i].z = centre.z - 0.7 + Double(row) * 1.9
         }
     }
 
@@ -171,7 +169,8 @@ final class PlazaScene {
 
     func step(_ dt: Double) {
         for i in walkers.indices {
-            var facing = 0.0
+            // Everyone keeps facing the viewer, whichever way they are walking.
+            let facing = atan2(camera.x - walkers[i].x, camera.z - walkers[i].z)
             switch walkers[i].mode {
             case .wandering:
                 if walkers[i].moving {
@@ -180,7 +179,6 @@ final class PlazaScene {
                         walkers[i].wait = .random(in: 1.5...6.5, using: &rng)
                     } else {
                         walkers[i].phase += dt * 8.5
-                        facing = atan2(walkers[i].targetX - walkers[i].x, walkers[i].targetZ - walkers[i].z)
                     }
                 } else {
                     walkers[i].wait -= dt
@@ -195,12 +193,11 @@ final class PlazaScene {
                     walkers[i].moving = false
                 } else {
                     walkers[i].phase += dt * 11
-                    facing = atan2(walkers[i].targetX - walkers[i].x, walkers[i].targetZ - walkers[i].z)
                 }
             case .waiting, .arrived:
                 break
             }
-            // Turn towards where they are going, or back to face the viewer, the short way round.
+            // Turn the short way round.
             var turn = (facing - walkers[i].heading).truncatingRemainder(dividingBy: 2 * .pi)
             if turn > .pi { turn -= 2 * .pi }
             if turn < -.pi { turn += 2 * .pi }
