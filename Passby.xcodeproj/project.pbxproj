@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1F5E82ABA44348CAB8472A73 /* CharacterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B52AED78A3B66CFEE78147 /* CharacterRenderer.swift */; };
+		24DA64FC0FAC9E4C4F00F504 /* theme.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5BB94B6885493A77B2E6EA8B /* theme.wav */; };
 		4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813D2F48030F4942002B6502 /* PlazaScene.swift */; };
 		4C5D29241379F654B3EA2762 /* CharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */; };
 		54D8F3EA383B8E1B59F5E724 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
@@ -73,6 +74,7 @@
 		52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassActivityAttributes.swift; sourceTree = "<group>"; };
 		57619FF182C1F63A465B3954 /* IslandGlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandGlow.swift; sourceTree = "<group>"; };
 		583F0A466DDA962889DACBFA /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		5BB94B6885493A77B2E6EA8B /* theme.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = theme.wav; sourceTree = "<group>"; };
 		6DABE00C2A9CA417D78C6097 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		813D2F48030F4942002B6502 /* PlazaScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaScene.swift; sourceTree = "<group>"; };
 		8A0DC52099855A0C74C2D8B7 /* PassbyLive.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PassbyLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -140,6 +142,7 @@
 				4D3CFF7BD6B004C0E18222F3 /* Info.plist */,
 				E0B931FBA4E55E2845E1BDA5 /* PassbyApp.swift */,
 				7EC903A09B39D24C7BA0116B /* Draw */,
+				FA7C268DE5B5FDB79686EF19 /* Resources */,
 				EA958E71495B2135FA800E6F /* Services */,
 				13F1386E711911717C2F1156 /* UI */,
 			);
@@ -228,6 +231,14 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
+		FA7C268DE5B5FDB79686EF19 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				5BB94B6885493A77B2E6EA8B /* theme.wav */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -254,6 +265,7 @@
 			buildConfigurationList = 9EDDD605D8EDAEABDCB69AF8 /* Build configuration list for PBXNativeTarget "Passby" */;
 			buildPhases = (
 				A7FF1A3EF09AC7E0A7BCF966 /* Sources */,
+				520527ABBD9F3116FAB20899 /* Resources */,
 				6C0AA56A6ADE63C3BD02E46F /* Frameworks */,
 				CA39C209B0007A71F66C303F /* Embed Foundation Extensions */,
 			);
@@ -311,6 +323,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		520527ABBD9F3116FAB20899 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				24DA64FC0FAC9E4C4F00F504 /* theme.wav in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		7C1175716E21977CDD7837BE /* Sources */ = {

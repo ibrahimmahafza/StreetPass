@@ -3,7 +3,7 @@
 # usage: tools/sim.sh <demo> [out.png]      demo: plaza waiting card me people settings onboarding gallery
 # env:   SIM=<simulator udid>  WAIT=<seconds before the screenshot>  NOBUILD=1 to skip the build
 #        SHOT_MAX=<longest side of the screenshot in pixels>
-#        ARGS="<launch arguments>" replaces the default "-reset -demo <demo>"; ARGS="" launches plainly
+#        ARGS="<launch arguments>" replaces the default "-reset -mute -demo <demo>"; ARGS="" launches plainly
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DEMO=${1:-plaza}
@@ -26,7 +26,7 @@ xcrun simctl bootstatus "$SIM" -b > /dev/null
 xcrun simctl terminate "$SIM" com.passbyplaza.app 2>/dev/null || true
 xcrun simctl install "$SIM" "$DD/Build/Products/Debug-iphonesimulator/Passby.app"
 # shellcheck disable=SC2086
-xcrun simctl launch "$SIM" com.passbyplaza.app ${ARGS--reset -demo "$DEMO"} > /dev/null
+xcrun simctl launch "$SIM" com.passbyplaza.app ${ARGS--reset -mute -demo "$DEMO"} > /dev/null
 sleep "${WAIT:-3}"
 xcrun simctl io "$SIM" screenshot "$OUT" > /dev/null 2>&1
 sips -Z "${SHOT_MAX:-1300}" "$OUT" > /dev/null 2>&1 || true

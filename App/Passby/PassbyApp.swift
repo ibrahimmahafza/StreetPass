@@ -4,10 +4,15 @@ import SwiftUI
 @main
 struct PassbyApp: App {
     @State private var model = AppModel.live()
+    @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
-            RootView().environment(model)
+            RootView()
+                .environment(model)
+                .onChange(of: phase, initial: true) { _, phase in
+                    model.sceneChanged(active: phase == .active)
+                }
         }
     }
 }

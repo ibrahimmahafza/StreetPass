@@ -6,7 +6,11 @@ import PassbyCore
 @MainActor @Observable
 final class AppModel {
     var state: PlazaState {
-        didSet { if state != oldValue { try? store.save(state) } }
+        didSet {
+            guard state != oldValue else { return }
+            try? store.save(state)
+            applySettings()
+        }
     }
 
     /// Screen requested with `-demo <name>`, for screenshots and demos.
@@ -15,6 +19,7 @@ final class AppModel {
     let demoStep: Int
     /// Passes to simulate right after launch, requested with `-simulate <n>`.
     @ObservationIgnored private var pendingPasses: Int
+    @ObservationIgnored private var audioCheck = false
 
     @ObservationIgnored let audio = Audio()
     @ObservationIgnored private let store: Store
@@ -31,6 +36,25 @@ final class AppModel {
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }
         try? store.save(state)
+        audio.muted = arguments.contains("-mute")
+        audioCheck = arguments.contains("-audiocheck")
+        applySettings()
+    }
+
+    private func applySettings() {
+        audio.soundsOn = state.soundsOn
+        audio.musicOn = state.musicOn
+    }
+
+    /// The app came to the front or left it.
+    func sceneChanged(active: Bool) {
+        if active, audioCheck {
+            audioCheck = false
+            audio.muted = true
+            print("AUDIOCHECK \(audio.silentCheck())")
+            return
+        }
+        audio.setForeground(active)
     }
 
     static func live() -> AppModel {
@@ -74,7 +98,9 @@ final class AppModel {
     // MARK: Passing
 
     func handlePass(_ profile: Profile) {
-        state.recordPass(profile, at: Date())
+        if state.recordPass(profile, at: Date()) != .ignored {
+            audio.jingle()
+        }
     }
 
     func greet(_ id: UUID) {
