@@ -12,6 +12,7 @@ final class AppModel {
     /// Screen requested with `-demo <name>`, for screenshots and demos.
     let demo: String?
 
+    @ObservationIgnored let audio = Audio()
     @ObservationIgnored private let store: Store
     @ObservationIgnored private var rng = SeededGenerator(seed: 20261120)
 
@@ -27,6 +28,24 @@ final class AppModel {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Passby")
         return AppModel(store: Store(directory: dir), arguments: ProcessInfo.processInfo.arguments)
+    }
+
+    // MARK: You
+
+    func setLinked(_ kind: LinkEntry.Kind, items: [String]) {
+        switch kind {
+        case .spotify:
+            state.me?.artists = items
+            state.spotifyLinked = !items.isEmpty
+        case .steam:
+            state.me?.games = items
+            state.steamLinked = !items.isEmpty
+        }
+    }
+
+    /// One line under the Passing switch saying whether passing is working.
+    var passingStatus: String {
+        state.passingOn ? "Notices people nearby who also have the app" : "Off. Nobody will notice you either"
     }
 
     // MARK: Passing

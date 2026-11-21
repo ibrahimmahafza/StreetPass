@@ -9,6 +9,8 @@ struct PlazaView: View {
     /// People still to greet in the arrival that is under way. The first is the one talking.
     @State private var queue: [UUID] = []
     @State private var arriving = false
+    /// True when the open card was reached from the people list, so its button goes back there.
+    @State private var fromList = false
 
     private var waiting: [Encounter] { model.state.waiting }
 
@@ -95,31 +97,39 @@ struct PlazaView: View {
                 CardSheet(
                     encounter: encounter,
                     title: arriving ? (encounter.times <= 1 ? "New person" : "You passed again") : "Someone you passed",
-                    buttonTitle: arriving ? (more ? "Next person" : "Done") : "Close",
+                    buttonTitle: arriving ? (more ? "Next person" : "Done") : (fromList ? "Back to the list" : "Close"),
                     primary: more,
-                    onButton: dismiss,
-                    onClose: dismiss
+                    onButton: { fromList && !arriving ? open(.people) : dismiss() },
+                    onClose: dismiss,
+                    onLetter: { model.audio.voice(letter: $0, pitch: 60 + Int(id.uuid.0) % 20) }
                 )
                 .id(id)
             }
         case .me:
-            BottomSheet(title: "Your character", onClose: dismiss) { EmptyView() }
+            CharacterSheet(onClose: dismiss)
         case .people:
-            BottomSheet(title: "People you passed", onClose: dismiss) { EmptyView() }
+            PeopleSheet(onSelect: { id in
+                fromList = true
+                open(.card(id, arriving: false))
+            }, onClose: dismiss)
         case .settings:
-            BottomSheet(title: "Settings", onClose: dismiss) { EmptyView() }
+            SettingsSheet(onClose: dismiss)
         }
     }
 
     // MARK: Actions
 
     private func open(_ target: Sheet) {
+        if case .card = target {} else { fromList = false }
+        model.audio.blip()
         withAnimation(.snappy(duration: 0.3)) { sheet = target }
     }
 
     /// Closes the open panel. During an arrival it moves on to the next person instead.
     private func dismiss() {
+        model.audio.blip()
         guard arriving, let current = queue.first else {
+            fromList = false
             withAnimation(.snappy(duration: 0.3)) { sheet = nil }
             return
         }
@@ -144,6 +154,7 @@ struct PlazaView: View {
         guard !ids.isEmpty, !arriving else { return }
         arriving = true
         queue = ids
+        if !instantly { model.audio.jingle() }
         scene.beginArrival(ids, instantly: instantly) {
             scene.talking = ids[0]
             withAnimation(.snappy(duration: 0.3)) { sheet = .card(ids[0], arriving: true) }
