@@ -107,11 +107,12 @@ Achraf handed the how to Claude; approach 1 is Claude's pick.
 
 ## Changes after the first build (2026-11-20, late)
 
-- **Characters are low-poly 3D.** After seeing the first build Achraf dropped the Mii
-  request ("it doesn't have to be the miis") and asked for the characters to be
-  "slimmer, lower poly, facial features sharper, and 3d". They are now flat-faced 3D
-  models built in code (`Character3D.swift`): slim body, bevelled box head, sharp
-  cut-out eyes, brows, nose and mouth. Same seven choices as before.
+- **Characters are smooth 3D with egg heads and pencil faces.** After seeing the first
+  build Achraf dropped the Mii request ("it doesn't have to be the miis"). A low-poly
+  version came back as "way too cubical", and he then asked for heads like "up-side down
+  eggs" and facial features that "look more pencil drawn". The models are built in code
+  (`Character3D.swift`): a slim body in a hoodie, a smooth egg head that is widest above
+  the middle, and a face sketched as pencil strokes onto its front. Same seven choices.
 - **The plaza is real 3D** (SceneKit): a tilted camera over a checkerboard floor, people
   turn to face where they walk. `PlazaScene` is the simulation, `PlazaStage` draws it,
   `PlazaCamera` in PassbyCore is the shared geometry. Cards and lists use rendered stills.

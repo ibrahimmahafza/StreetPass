@@ -2,10 +2,10 @@ import PassbyCore
 import SceneKit
 import UIKit
 
-/// Builds a character as a low-poly 3D model. Change the look of everyone by changing this file.
+/// Builds a character as a smooth 3D model. Change the look of everyone by changing this file.
 ///
-/// A character is 100 units tall, stands on the origin and faces +z. The body is made of a few
-/// flat-faced solids; the face is thin sharp-edged cut-outs stuck to the front of the head.
+/// A character is 100 units tall, stands on the origin and faces +z. The head is an egg standing
+/// on its narrow end; the face is a pencil sketch drawn onto its front.
 enum Character3D {
     /// Node names used by `pose`.
     private enum Part {
@@ -13,10 +13,6 @@ enum Character3D {
     }
 
     private static let armSpread: Float = 0.26
-
-    // The head is a box with bevelled edges. Its flat front face is where the features go.
-    private static let headCentre: CGFloat = 83
-    private static let faceZ: CGFloat = 16
 
     static func make(_ rawLook: Look) -> SCNNode {
         let look = rawLook.clamped()
@@ -36,45 +32,47 @@ enum Character3D {
             leg.name = s < 0 ? Part.legLeft : Part.legRight
             leg.position = SCNVector3(s * 5.2, 40, 0)
             body.addChildNode(leg)
-            put(capsule(3.8, 32), pants, 0, -16, 0, in: leg)
-            put(box(9.4, 6, 17, 2.2), RGB(0xF4F6F9), 0, -35.6, 2.8, in: leg)
-            put(box(9.8, 2, 17.4, 0.6), RGB(0xAEBAC8), 0, -39, 2.8, in: leg)
-            put(box(4.4, 1.8, 5.4, 0.5), top, 0, -32.4, 6, in: leg)
+            put(SCNCapsule(capRadius: 3.8, height: 32), pants, 0, -16, 0, in: leg)
+            put(box(9.4, 6.4, 17, 3), RGB(0xF4F6F9), 0, -35.8, 2.8, in: leg)
+            put(box(9.8, 2, 17.4, 1), RGB(0xAEBAC8), 0, -39, 2.8, in: leg)
+            put(box(4.4, 1.8, 5.4, 0.8), top, 0, -32.4, 6, in: leg)
         }
 
-        // Hoodie: a tapered body with a hem, pocket, drawstrings, shoulders and the hood behind the neck.
-        let torso = put(cone(top: 9.6, bottom: 11.8, height: 30, sides: 8), top, 0, 53, 0, in: body)
-        torso.scale = SCNVector3(1, 1, 0.72)
-        torso.eulerAngles.y = .pi / 8
-        let hem = put(cone(top: 12.4, bottom: 12.4, height: 3.6, sides: 8), top.mix(-0.12), 0, 39.6, 0, in: body)
-        hem.scale = SCNVector3(1, 1, 0.72)
-        hem.eulerAngles.y = .pi / 8
-        put(box(13, 6.4, 2, 0.7), top.mix(-0.1), 0, 46.4, 8, in: body)
+        // Hoodie: body, hem, pocket, drawstrings, and the hood resting behind the neck.
+        put(SCNCapsule(capRadius: 11.4, height: 33), top, 0, 54.5, 0, in: body).scale = SCNVector3(1, 1, 0.74)
+        put(SCNTorus(ringRadius: 10.4, pipeRadius: 1.7), top.mix(-0.1), 0, 40.8, 0, in: body).scale = SCNVector3(1, 1, 0.74)
+        put(box(12.5, 6.2, 2.4, 1.2), top.mix(-0.09), 0, 46.5, 7.5, in: body)
         for s: CGFloat in [-1, 1] {
-            put(box(1, 8, 1, 0.2), RGB(0xFFFFFF), s * 3, 61.5, 7.3, in: body)
-            put(sphere(5.2, 6), top, s * 10.6, 64.6, 0, in: body)
+            put(SCNCapsule(capRadius: 0.55, height: 8), RGB(0xFFFFFF), s * 3, 61, 8, in: body)
         }
-        put(sphere(1, 6), top.mix(-0.07), 0, 67, -6.4, in: body).scale = SCNVector3(11, 6, 7.4)
+        put(SCNSphere(radius: 1), top.mix(-0.06), 0, 66.5, -6.4, in: body).scale = SCNVector3(10.5, 5.6, 7)
 
         // Arms with mitten hands, from pivots at the shoulders.
         for s: CGFloat in [-1, 1] {
             let arm = SCNNode()
             arm.name = s < 0 ? Part.armLeft : Part.armRight
-            arm.position = SCNVector3(s * 11.6, 64, 0)
+            arm.position = SCNVector3(s * 11.2, 63.5, 0)
             arm.eulerAngles.z = Float(s) * armSpread
             body.addChildNode(arm)
-            put(capsule(3.4, 27), top, 0, -12.5, 0, in: arm)
-            put(sphere(4.2, 6), skin, 0, -25.8, 0, in: arm)
+            put(SCNCapsule(capRadius: 3.4, height: 27), top, 0, -12.5, 0, in: arm)
+            put(SCNSphere(radius: 4.2), skin, 0, -25.6, 0, in: arm)
         }
 
-        // Head, ears and nose.
-        put(box(36, 34, 32, 6), skin, 0, headCentre, 0, in: body)
+        // Head: the egg, ears, and the sketched face laid over its front.
+        let head = SCNNode(geometry: Egg.shell.copy() as? SCNGeometry)
+        head.geometry?.firstMaterial = material(skin)
+        head.position = SCNVector3(0, Egg.centre, 0)
+        head.scale = SCNVector3(1, 1, Egg.flatten)
+        body.addChildNode(head)
+        let earX = Egg.radius(at: 81)
         for s: CGFloat in [-1, 1] {
-            put(box(3, 7, 5, 1), skin.mix(-0.08), s * 18.6, 82, -1, in: body)
+            put(SCNSphere(radius: 3.6), skin.mix(-0.05), s * earX, 81, 0, in: body).scale = SCNVector3(0.6, 1, 0.9)
         }
-        put(pyramid(4.2, 5, 3.8), skin.mix(-0.1), 0, 77.5, faceZ, in: body)
+        let face = SCNNode(geometry: Egg.facePatch.copy() as? SCNGeometry)
+        face.geometry?.firstMaterial = Sketch.material(eyes: look.eyes, mouth: look.mouth, brow: hair.mix(-0.4), darkSkin: look.skin >= 4)
+        face.renderingOrder = 1
+        body.addChildNode(face)
 
-        addFace(look, hair: hair, to: body)
         addHair(look.hair, hair, skin: skin, to: body)
         addExtra(look.extra, top: top, to: body)
         return root
@@ -91,128 +89,169 @@ enum Character3D {
         node.childNode(withName: Part.armRight, recursively: true)?.eulerAngles = SCNVector3(swing * 0.6, 0, armSpread)
     }
 
-    // MARK: Face
+    // MARK: Head
 
-    private static func addFace(_ look: Look, hair: RGB, to body: SCNNode) {
-        // Darker skins get a darker ink so the features keep their edge.
-        let ink = look.skin >= 4 ? RGB(0x120E14) : RGB(0x25212B)
-        let white = RGB(0xFFFFFF)
-        let ex: CGFloat = 7.2, ey: CGFloat = 82.2, my: CGFloat = 73.3
+    /// The head: an egg standing on its narrow end, so it is widest above the middle and tapers to the chin.
+    enum Egg {
+        static let centre: CGFloat = 82.5
+        static let height: CGFloat = 37
+        static let girth: CGFloat = 16.2
+        /// How much wider the top half is than the bottom half.
+        static let lean: CGFloat = 0.22
+        /// The head is a little shallower front to back than it is wide.
+        static let flatten: CGFloat = 0.94
 
-        /// An open eye: a white lens, a dark pupil with a glint, and a heavy upper lid.
-        func eye(_ x: CGFloat, _ rx: CGFloat, _ ry: CGFloat) {
-            stick(polygon([(-rx * 0.55, ry), (rx * 0.55, ry), (rx, 0), (rx * 0.55, -ry), (-rx * 0.55, -ry), (-rx, 0)]), white, at: x, ey, in: body)
-            let px = rx * 0.6, py = ry * 0.82
-            stick(polygon([(-px * 0.5, py), (px * 0.5, py), (px, 0), (px * 0.5, -py), (-px * 0.5, -py), (-px, 0)]), ink, at: x, ey, in: body, layer: 2)
-            stick(polygon([(-px * 0.55, py * 0.7), (px * 0.1, py * 0.7), (-px * 0.55, py * 0.05)]), white, at: x, ey, in: body, layer: 3)
-            stick(polygon([(-rx * 0.95, ry - 0.3), (rx * 0.95, ry - 0.3), (rx * 0.7, ry + 0.9), (-rx * 0.7, ry + 0.9)]), ink, at: x, ey, in: body, layer: 3)
+        /// The part of the front that the face is drawn on, in character units.
+        static let faceX: ClosedRange<CGFloat> = -14...14
+        static let faceY: ClosedRange<CGFloat> = 67...95
+
+        /// Radius of the egg and the slope of its outline at a height. `nr` and `ny` are the outward
+        /// direction of the surface in the (sideways, up) plane.
+        private static func outline(at y: CGFloat) -> (r: CGFloat, nr: CGFloat, ny: CGFloat) {
+            let c = max(-1, min(1, -(y - centre) / (height / 2)))
+            let s = sqrt(1 - c * c)
+            let r = girth * s * (1 - lean * c)
+            let dy = s * height / 2
+            let dr = girth * (c * (1 - lean * c) + lean * s * s)
+            let length = max(hypot(dy, dr), 0.0001)
+            return (r, dy / length, -dr / length)
         }
-        func closedEye(_ x: CGFloat) {
-            stick(thickLine([(-3.4, -1.5), (0, 1.7), (3.4, -1.5)], 1.9), ink, at: x, ey, in: body)
+
+        static func radius(at y: CGFloat) -> CGFloat {
+            outline(at: y).r
         }
-        switch look.eyes {
-        case 0:
-            eye(-ex, 3.5, 3.6)
-            eye(ex, 3.5, 3.6)
-        case 1:
-            eye(-ex, 2.9, 4.4)
-            eye(ex, 2.9, 4.4)
-        case 2:
-            for s: CGFloat in [-1, 1] {
-                stick(polygon([(-3.4, 0.6), (3.4, 0.6), (2, -2.8), (-2, -2.8)]), white, at: s * ex, ey, in: body)
-                stick(polygon([(-1.7, 0.6), (1.7, 0.6), (1.2, -2.5), (-1.2, -2.5)]), ink, at: s * ex, ey, in: body, layer: 2)
-                stick(polygon([(-3.9, 0.6), (3.9, 0.6), (3.9, 2.2), (-3.9, 2.2)]), ink, at: s * ex, ey, in: body, layer: 3)
+
+        /// A point on the front of the head `angle` radians round from straight ahead, and the way the surface faces there.
+        static func front(angle: CGFloat, y: CGFloat) -> (point: SCNVector3, normal: SCNVector3) {
+            let o = outline(at: y)
+            let x = o.r * sin(angle), z = o.r * cos(angle)
+            let n = simd_normalize(SIMD3<Float>(Float(o.nr * sin(angle)), Float(o.ny), Float(o.nr * cos(angle) / flatten)))
+            return (SCNVector3(x, y, z * flatten), SCNVector3(n))
+        }
+
+        /// The point on the front of the head directly in front of (x, y).
+        static func front(x: CGFloat, y: CGFloat) -> (point: SCNVector3, normal: SCNVector3) {
+            let r = max(radius(at: y), 0.001)
+            return front(angle: asin(max(-0.98, min(0.98, x / r))), y: y)
+        }
+
+        /// The whole egg, smooth, centred on its own origin.
+        static let shell: SCNGeometry = {
+            let stacks = 28, sides = 36
+            var positions: [SCNVector3] = [], normals: [SCNVector3] = [], indices: [Int32] = []
+            for i in 0...stacks {
+                let y = centre - height / 2 + height * CGFloat(i) / CGFloat(stacks)
+                var o = outline(at: y)
+                if i == 0 { o = (0, 0, -1) }
+                if i == stacks { o = (0, 0, 1) }
+                for j in 0...sides {
+                    let a = CGFloat(j) / CGFloat(sides) * 2 * .pi
+                    positions.append(SCNVector3(cos(a) * o.r, y - centre, sin(a) * o.r))
+                    normals.append(SCNVector3(cos(a) * o.nr, o.ny, sin(a) * o.nr))
+                }
             }
-        case 3:
-            closedEye(-ex)
-            closedEye(ex)
-        default:
-            eye(-ex, 3.5, 3.6)
-            closedEye(ex)
-        }
-        if look.eyes != 3 {
-            for s: CGFloat in [-1, 1] {
-                // A straight bar, a touch higher towards the outside.
-                stick(polygon([(-s * 4, -0.6), (s * 4, -1.2), (s * 4, 0.8), (-s * 4, 1.2)]), hair.mix(-0.4), at: s * ex, 88.1, in: body)
+            for i in 0..<stacks {
+                for j in 0..<sides {
+                    let a = Int32(i * (sides + 1) + j), b = a + 1, c = a + Int32(sides + 1), d = c + 1
+                    indices += [a, c, b, b, c, d]
+                }
             }
-        }
+            return SCNGeometry(
+                sources: [SCNGeometrySource(vertices: positions), SCNGeometrySource(normals: normals)],
+                elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+        }()
 
-        let dark = RGB(0x7A2732)
-        switch look.mouth {
-        case 0:
-            stick(thickLine([(-4.4, 1.1), (-2.3, -0.9), (2.3, -0.9), (4.4, 1.1)], 1.7), ink, at: 0, my, in: body)
-        case 1:
-            stick(polygon([(-4.8, 1.3), (4.8, 1.3), (3, -2.3), (-3, -2.3)]), dark, at: 0, my, in: body)
-            stick(polygon([(-4.1, 1.3), (4.1, 1.3), (3.6, 0), (-3.6, 0)]), white, at: 0, my, in: body, layer: 2)
-        case 2:
-            stick(polygon([(-3.6, -0.85), (3.6, -0.85), (3.6, 0.85), (-3.6, 0.85)]), ink, at: 0, my, in: body)
-        case 3:
-            stick(thickLine([(-4, -0.7), (1.4, -0.7), (4.2, 1.4)], 1.7), ink, at: 0, my, in: body)
-        default:
-            stick(polygon([(-1.2, 2.2), (1.2, 2.2), (2.3, 0), (1.2, -2.2), (-1.2, -2.2), (-2.3, 0)]), dark, at: 0, my, in: body)
-        }
+        /// A skin-tight patch over the front of the egg that carries the face drawing.
+        static let facePatch: SCNGeometry = {
+            let rows = 22, columns = 22
+            let reach: CGFloat = 1.2
+            var positions: [SCNVector3] = [], normals: [SCNVector3] = [], uvs: [CGPoint] = [], indices: [Int32] = []
+            for i in 0...rows {
+                let y = faceY.lowerBound + (faceY.upperBound - faceY.lowerBound) * CGFloat(i) / CGFloat(rows)
+                for j in 0...columns {
+                    let angle = -reach + 2 * reach * CGFloat(j) / CGFloat(columns)
+                    let (p, n) = front(angle: angle, y: y)
+                    positions.append(SCNVector3(p.x + n.x * 0.14, p.y + n.y * 0.14, p.z + n.z * 0.14))
+                    normals.append(n)
+                    uvs.append(CGPoint(
+                        x: (CGFloat(p.x) - faceX.lowerBound) / (faceX.upperBound - faceX.lowerBound),
+                        y: (faceY.upperBound - y) / (faceY.upperBound - faceY.lowerBound)))
+                }
+            }
+            for i in 0..<rows {
+                for j in 0..<columns {
+                    let a = Int32(i * (columns + 1) + j), b = a + 1, c = a + Int32(columns + 1), d = c + 1
+                    indices += [a, b, c, b, d, c]
+                }
+            }
+            return SCNGeometry(
+                sources: [SCNGeometrySource(vertices: positions), SCNGeometrySource(normals: normals), SCNGeometrySource(textureCoordinates: uvs)],
+                elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+        }()
     }
 
     // MARK: Hair
 
     private static func addHair(_ style: Int, _ hair: RGB, skin: RGB, to body: SCNNode) {
-        /// The slab of hair on top, a little bigger than the skull. Its top sits at the same height whatever its thickness.
-        func crown(_ thickness: CGFloat, color: RGB? = nil, grow: CGFloat = 0) {
-            put(box(38.6 + grow, thickness, 34.6 + grow, min(5, thickness / 2 - 0.3)), color ?? hair, 0, 102.4 - thickness / 2, 0, in: body)
+        /// The hair on top: an oval dome a little bigger than the skull, so the head cuts its lower edge into a hairline.
+        func cap(_ rx: CGFloat = 18.3, _ ry: CGFloat = 10.5, _ rz: CGFloat = 17.7, y: CGFloat = 93.5, z: CGFloat = -1.5, color: RGB? = nil) {
+            put(SCNSphere(radius: 1), color ?? hair, 0, y, z, in: body).scale = SCNVector3(rx, ry, rz)
         }
-        func back(downTo bottom: CGFloat, width: CGFloat = 38.6, depth: CGFloat = 8) {
-            put(box(width, 98 - bottom, depth, 3), hair.mix(-0.07), 0, (98 + bottom) / 2, -17.3 + depth / 2, in: body)
+        func back(downTo bottom: CGFloat, width: CGFloat = 30, depth: CGFloat = 8) {
+            put(box(width, 97 - bottom, depth, 3.8), hair.mix(-0.06), 0, (97 + bottom) / 2, -15.6 + depth / 2, in: body)
         }
-        func sides(downTo bottom: CGFloat, depth: CGFloat = 22) {
+        func sides(downTo bottom: CGFloat, depth: CGFloat = 18) {
             for s: CGFloat in [-1, 1] {
-                put(box(5.4, 96 - bottom, depth, 2), hair.mix(-0.04), s * 19.5, (96 + bottom) / 2, -3, in: body)
+                put(box(5.6, 95 - bottom, depth, 2.6), hair.mix(-0.04), s * 15.4, (95 + bottom) / 2, -3, in: body)
             }
         }
 
         switch style {
         case 0:
-            crown(12.5)
-            back(downTo: 74)
-        case 1:
-            crown(11)
-            back(downTo: 74)
-            let fringe = put(box(20, 5, 3.6, 1.2), hair, -6, 91.4, 16.6, in: body)
-            fringe.eulerAngles.z = 0.2
-        case 2:
-            crown(11.5)
+            cap()
             back(downTo: 76)
-            put(sphere(7.6, 6), hair, 0, 108.5, -4, in: body)
+        case 1:
+            cap()
+            back(downTo: 76)
+            let fringe = put(SCNSphere(radius: 1), hair, -5.5, 90.6, 13.2, in: body)
+            fringe.scale = SCNVector3(11.5, 4.4, 4.2)
+            fringe.eulerAngles.z = 0.26
+        case 2:
+            cap()
+            back(downTo: 78)
+            put(SCNSphere(radius: 7.4), hair, 0, 108, -4, in: body)
         case 3:
-            crown(12)
-            back(downTo: 52, width: 39.4)
+            cap()
+            back(downTo: 52, width: 31, depth: 9)
             sides(downTo: 58)
         case 4:
             let lumps: [(CGFloat, CGFloat, CGFloat)] = [
-                (-13.5, 97.5, 10), (-4.5, 99, 11), (4.5, 99, 11), (13.5, 97.5, 10),
-                (-13.5, 102, -1), (-4.5, 104, -1), (4.5, 104, -1), (13.5, 102, -1),
-                (-13.5, 97, -12), (-4.5, 99, -13), (4.5, 99, -13), (13.5, 97, -12),
-                (-9, 86, -15), (0, 86, -16), (9, 86, -15), (-19, 90, -2), (19, 90, -2),
+                (-11.5, 96, 8.5), (-4, 98, 10), (4, 98, 10), (11.5, 96, 8.5),
+                (-12.5, 101, -1), (-4.5, 103.5, -1), (4.5, 103.5, -1), (12.5, 101, -1),
+                (-11.5, 96.5, -10.5), (-4, 98.5, -12), (4, 98.5, -12), (11.5, 96.5, -10.5),
+                (-8, 86, -13), (0, 86, -14), (8, 86, -13), (-16, 90, -2), (16, 90, -2),
             ]
             for (i, p) in lumps.enumerated() {
-                put(sphere(8, 5), hair.mix(i % 2 == 0 ? 0 : -0.06), p.0, p.1, p.2, in: body)
+                put(SCNSphere(radius: 7.4), hair.mix(i % 2 == 0 ? 0 : -0.05), p.0, p.1, p.2, in: body)
             }
         case 5:
-            crown(7, color: hair.blend(skin, 0.22), grow: -1.4)
+            cap(17.5, 9.4, 16.9, y: 92.8, z: -1.2, color: hair.blend(skin, 0.2))
         case 6:
-            crown(9)
-            back(downTo: 76)
+            cap()
+            back(downTo: 78)
             for row in 0..<2 {
                 for i in 0..<4 {
-                    let x = CGFloat(i) * 8 - 12
-                    let spike = put(cone(top: 0, bottom: 5.2, height: 12, sides: 5), hair, x, 106.5, CGFloat(6 - row * 13), in: body)
-                    spike.eulerAngles = SCNVector3(row == 0 ? 0.25 : -0.3, 0, Float(x) * -0.022)
+                    let x = CGFloat(i) * 7.4 - 11.1
+                    let spike = put(SCNCone(topRadius: 0, bottomRadius: 5, height: 12), hair, x, 105, CGFloat(5 - row * 11), in: body)
+                    spike.eulerAngles = SCNVector3(row == 0 ? 0.3 : -0.3, 0, Float(x) * -0.03)
                 }
             }
         default:
-            crown(12)
-            back(downTo: 70, width: 39.6, depth: 9)
-            sides(downTo: 70, depth: 24)
-            put(box(31, 4.6, 3.6, 1), hair, 0, 91.6, 16.4, in: body)
+            cap()
+            back(downTo: 70, width: 31, depth: 9)
+            sides(downTo: 70, depth: 20)
+            let fringe = put(SCNSphere(radius: 1), hair, 0, 90.8, 12.6, in: body)
+            fringe.scale = SCNVector3(13.5, 3.8, 4)
         }
     }
 
@@ -223,202 +262,61 @@ enum Character3D {
         case 1:
             let dark = RGB(0x2A2F3B)
             for s: CGFloat in [-1, 1] {
-                put(extrude(frame(9.6, 8, 1), 1), dark, s * 7.2, 82.4, faceZ + 1.6, in: body).geometry?.firstMaterial = flat(dark)
+                let (p, n) = Egg.front(x: s * Sketch.eyeX, y: Sketch.eyeY)
+                let rim = put(SCNTorus(ringRadius: 4.4, pipeRadius: 0.5), dark, CGFloat(p.x + n.x * 1.2), CGFloat(p.y + n.y * 1.2), CGFloat(p.z + n.z * 1.2), in: body)
+                rim.eulerAngles = SCNVector3(asin(-n.y) + .pi / 2, atan2(n.x, n.z), 0)
             }
-            put(box(5, 1, 1, 0.2), dark, 0, 83.4, faceZ + 1.6, in: body)
+            let bridge = put(SCNCapsule(capRadius: 0.5, height: 5), dark, 0, Sketch.eyeY + 0.4, CGFloat(Egg.front(x: 0, y: Sketch.eyeY).point.z) + 1.3, in: body)
+            bridge.eulerAngles.z = .pi / 2
         case 2:
             let red = RGB(0xFF5E57)
-            put(box(39.8, 9.6, 35.8, 4), red, 0, 99, 0, in: body)
-            let visor = put(box(27, 2, 13, 0.7), red.mix(-0.2), 0, 94.6, 22.6, in: body)
+            put(SCNSphere(radius: 1), red, 0, 94.2, -1.5, in: body).scale = SCNVector3(19.2, 11.4, 18.6)
+            let visor = put(box(24, 2, 12, 1), red.mix(-0.2), 0, 91.2, 19.5, in: body)
             visor.eulerAngles.x = 0.14
         case 3:
             let dark = RGB(0x363E4C)
-            put(extrude(arcStroke(radius: 21.6, from: .pi * 0.07, to: .pi * 0.93, width: 3, steps: 7), 4), dark, 0, 84, -1, in: body)
+            let band = CGMutablePath()
+            band.addArc(center: .zero, radius: 19.6, startAngle: .pi * 0.08, endAngle: .pi * 0.92, clockwise: false)
+            let outline = band.copy(strokingWithWidth: 2.8, lineCap: .round, lineJoin: .round, miterLimit: 10)
+            let bezier = UIBezierPath(cgPath: outline)
+            bezier.flatness = 0.05
+            put(SCNShape(path: bezier, extrusionDepth: 4), dark, 0, 84, -1, in: body)
             for s: CGFloat in [-1, 1] {
-                put(box(5.6, 13, 11, 2), dark, s * 21.4, 82.5, -1, in: body)
-                put(box(1, 7, 1.4, 0.3), RGB(0x34D67A), s * 24.4, 82.5, -1, in: body)
+                put(box(5.4, 12.5, 11, 2.5), dark, s * 18.4, 82.5, -1, in: body)
+                put(box(1, 7, 1.4, 0.4), RGB(0x34D67A), s * 21.3, 82.5, -1, in: body)
             }
         case 4:
-            put(box(39.8, 13, 35.8, 5.5), top.mix(-0.14), 0, 98.2, 0, in: body)
-            put(box(41, 5.6, 37, 1.4), top.mix(0.3), 0, 92, 0, in: body)
-            put(sphere(4, 5), top.mix(0.3), 0, 107, 0, in: body)
+            put(SCNSphere(radius: 1), top.mix(-0.12), 0, 94.5, -1.5, in: body).scale = SCNVector3(19, 12.4, 18.4)
+            put(SCNTorus(ringRadius: 16.9, pipeRadius: 3), top.mix(0.3), 0, 90.4, -0.5, in: body).scale = SCNVector3(1, 1, 0.95)
+            put(SCNSphere(radius: 3.8), top.mix(0.3), 0, 107.4, -1.5, in: body)
         case 5:
             let pink = RGB(0xFF7FBA)
             let bow = SCNNode()
-            bow.position = SCNVector3(10.5, 100.6, 15.6)
-            bow.eulerAngles = SCNVector3(-0.5, 0.2, -0.15)
+            bow.position = SCNVector3(10, 100.5, 11)
+            bow.eulerAngles = SCNVector3(-0.5, 0.3, -0.2)
             body.addChildNode(bow)
             for s: CGFloat in [-1, 1] {
-                let wing = put(pyramid(6.4, 5.6, 3), pink, s * 5.4, 0, 0, in: bow)
-                wing.eulerAngles.z = Float(s) * .pi / 2
+                put(SCNSphere(radius: 1), pink, s * 4.4, 0, 0, in: bow).scale = SCNVector3(4.4, 3.4, 2.4)
             }
-            put(box(2.8, 3.4, 3.2, 0.6), pink.mix(-0.2), 0, 0, 0.4, in: bow)
+            put(SCNSphere(radius: 2.3), pink.mix(-0.2), 0, 0, 0.8, in: bow)
         default:
             break
         }
     }
 
-    // MARK: Solids
+    // MARK: Building blocks
 
-    // Every solid is built here triangle by triangle, each face flat, which is what makes the
-    // models read as low-poly. All of them are convex and centred on their own origin.
-
-    private static var solids: [String: SCNGeometry] = [:]
     private static var materials: [String: SCNMaterial] = [:]
 
-    private struct Mesh {
-        var positions: [SCNVector3] = []
-        var normals: [SCNVector3] = []
-
-        /// Adds a flat face through these corners, turned to face away from the middle of the solid.
-        mutating func face(_ corners: [SIMD3<Float>]) {
-            guard corners.count >= 3 else { return }
-            var normal = simd_cross(corners[1] - corners[0], corners[2] - corners[0])
-            guard simd_length(normal) > 1e-6 else { return }
-            normal = simd_normalize(normal)
-            var ordered = corners
-            let middle = corners.reduce(SIMD3<Float>(repeating: 0), +) / Float(corners.count)
-            if simd_dot(normal, middle) < 0 {
-                normal = -normal
-                ordered.reverse()
-            }
-            for i in 1..<(ordered.count - 1) {
-                for corner in [ordered[0], ordered[i], ordered[i + 1]] {
-                    positions.append(SCNVector3(corner))
-                    normals.append(SCNVector3(normal))
-                }
-            }
-        }
-
-        var geometry: SCNGeometry {
-            SCNGeometry(
-                sources: [SCNGeometrySource(vertices: positions), SCNGeometrySource(normals: normals)],
-                elements: [SCNGeometryElement(indices: (0..<Int32(positions.count)).map { $0 }, primitiveType: .triangles)])
-        }
-    }
-
-    /// Builds a solid once per `key` and hands out cheap copies that can each take their own colour.
-    private static func solid(_ key: String, _ build: (inout Mesh) -> Void) -> SCNGeometry {
-        if let cached = solids[key] { return cached.copy() as! SCNGeometry }
-        var mesh = Mesh()
-        build(&mesh)
-        let made = mesh.geometry
-        solids[key] = made
-        return made.copy() as! SCNGeometry
-    }
-
-    /// A shape turned on a lathe: rings of `sides` corners at each height, joined by flat panels and capped.
-    private static func lathe(_ mesh: inout Mesh, _ rings: [(y: CGFloat, r: CGFloat)], sides: Int) {
-        func ring(_ k: Int) -> [SIMD3<Float>] {
-            (0..<sides).map { i in
-                let a = CGFloat(i) / CGFloat(sides) * 2 * .pi
-                return SIMD3(Float(cos(a) * rings[k].r), Float(rings[k].y), Float(sin(a) * rings[k].r))
-            }
-        }
-        for k in 0..<(rings.count - 1) {
-            let lower = ring(k), upper = ring(k + 1)
-            for i in 0..<sides {
-                let j = (i + 1) % sides
-                if rings[k].r < 0.001 {
-                    mesh.face([lower[i], upper[j], upper[i]])
-                } else if rings[k + 1].r < 0.001 {
-                    mesh.face([lower[i], lower[j], upper[i]])
-                } else {
-                    mesh.face([lower[i], lower[j], upper[j], upper[i]])
-                }
-            }
-        }
-        if let first = rings.first, first.r > 0.001 { mesh.face(ring(0)) }
-        if let last = rings.last, last.r > 0.001 { mesh.face(ring(rings.count - 1)) }
-    }
-
-    /// A box with each edge cut by a single bevel.
-    private static func box(_ w: CGFloat, _ h: CGFloat, _ l: CGFloat, _ bevel: CGFloat) -> SCNGeometry {
-        solid("box \(w) \(h) \(l) \(bevel)") { mesh in
-            let b = max(0.01, min(bevel, min(w, h, l) / 2 - 0.01))
-            let x = Float(w / 2), y = Float(h / 2), z = Float(l / 2), c = Float(b)
-            let signs: [Float] = [-1, 1]
-            // Each corner of the box becomes three corners, one on each face that meets there.
-            func onX(_ sx: Float, _ sy: Float, _ sz: Float) -> SIMD3<Float> { SIMD3(sx * x, sy * (y - c), sz * (z - c)) }
-            func onY(_ sx: Float, _ sy: Float, _ sz: Float) -> SIMD3<Float> { SIMD3(sx * (x - c), sy * y, sz * (z - c)) }
-            func onZ(_ sx: Float, _ sy: Float, _ sz: Float) -> SIMD3<Float> { SIMD3(sx * (x - c), sy * (y - c), sz * z) }
-            for s in signs {
-                mesh.face([onX(s, -1, -1), onX(s, 1, -1), onX(s, 1, 1), onX(s, -1, 1)])
-                mesh.face([onY(-1, s, -1), onY(1, s, -1), onY(1, s, 1), onY(-1, s, 1)])
-                mesh.face([onZ(-1, -1, s), onZ(1, -1, s), onZ(1, 1, s), onZ(-1, 1, s)])
-            }
-            for a in signs {
-                for b in signs {
-                    mesh.face([onX(a, b, -1), onX(a, b, 1), onY(a, b, 1), onY(a, b, -1)])
-                    mesh.face([onX(a, -1, b), onX(a, 1, b), onZ(a, 1, b), onZ(a, -1, b)])
-                    mesh.face([onY(-1, a, b), onY(1, a, b), onZ(1, a, b), onZ(-1, a, b)])
-                    for d in signs {
-                        mesh.face([onX(a, b, d), onY(a, b, d), onZ(a, b, d)])
-                    }
-                }
-            }
-        }
-    }
-
-    private static func sphere(_ radius: CGFloat, _ segments: Int) -> SCNGeometry {
-        solid("sphere \(radius) \(segments)") { mesh in
-            let stacks = max(2, (segments + 1) / 2)
-            let rings = (0...stacks).map { k -> (y: CGFloat, r: CGFloat) in
-                let a = CGFloat(k) / CGFloat(stacks) * .pi
-                return (-cos(a) * radius, k == 0 || k == stacks ? 0 : sin(a) * radius)
-            }
-            lathe(&mesh, rings, sides: segments)
-        }
-    }
-
-    /// A six-sided rod with pointed, two-step ends.
-    private static func capsule(_ radius: CGFloat, _ height: CGFloat) -> SCNGeometry {
-        solid("capsule \(radius) \(height)") { mesh in
-            let half = height / 2
-            lathe(&mesh, [
-                (-half, 0), (-half + radius * 0.3, radius * 0.72), (-half + radius, radius),
-                (half - radius, radius), (half - radius * 0.3, radius * 0.72), (half, 0),
-            ], sides: 6)
-        }
-    }
-
-    private static func cone(top: CGFloat, bottom: CGFloat, height: CGFloat, sides: Int) -> SCNGeometry {
-        solid("cone \(top) \(bottom) \(height) \(sides)") { mesh in
-            lathe(&mesh, [(-height / 2, bottom), (height / 2, top)], sides: sides)
-        }
-    }
-
-    /// A four-sided pyramid with its point up, centred half way up.
-    private static func pyramid(_ w: CGFloat, _ h: CGFloat, _ l: CGFloat) -> SCNGeometry {
-        solid("pyramid \(w) \(h) \(l)") { mesh in
-            let x = Float(w / 2), y = Float(h / 2), z = Float(l / 2)
-            let base: [SIMD3<Float>] = [SIMD3(-x, -y, -z), SIMD3(x, -y, -z), SIMD3(x, -y, z), SIMD3(-x, -y, z)]
-            let tip = SIMD3<Float>(0, y, 0)
-            mesh.face(base)
-            for i in 0..<4 {
-                mesh.face([base[i], base[(i + 1) % 4], tip])
-            }
-        }
-    }
-
-    /// A matte finish, shared between everything of the same colour.
+    /// A soft plastic finish, shared between everything of the same colour.
     private static func material(_ color: RGB) -> SCNMaterial {
         let key = "\(color.r),\(color.g),\(color.b)"
         if let cached = materials[key] { return cached }
         let m = SCNMaterial()
-        m.lightingModel = .lambert
+        m.lightingModel = .blinn
         m.diffuse.contents = UIColor(cgColor: color.cg())
-        materials[key] = m
-        return m
-    }
-
-    /// Ink that ignores the lights, so features stay crisp from every angle.
-    private static func flat(_ color: RGB) -> SCNMaterial {
-        let key = "flat \(color.r),\(color.g),\(color.b)"
-        if let cached = materials[key] { return cached }
-        let m = SCNMaterial()
-        m.lightingModel = .constant
-        m.diffuse.contents = UIColor(cgColor: color.cg())
+        m.specular.contents = UIColor(white: 0.12, alpha: 1)
+        m.shininess = 0.2
         materials[key] = m
         return m
     }
@@ -432,69 +330,169 @@ enum Character3D {
         return node
     }
 
-    /// Sticks a flat cut-out onto the front of the face, centred at (x, y). Higher layers sit on top.
-    private static func stick(_ outline: CGPath, _ color: RGB, at x: CGFloat, _ y: CGFloat, in parent: SCNNode, layer: CGFloat = 1) {
-        let shape = extrude(outline, 0.5)
-        shape.firstMaterial = flat(color)
-        let node = SCNNode(geometry: shape)
-        node.position = SCNVector3(x, y, faceZ + 0.1 + layer * 0.3)
-        parent.addChildNode(node)
+    private static func box(_ w: CGFloat, _ h: CGFloat, _ l: CGFloat, _ r: CGFloat) -> SCNBox {
+        let b = SCNBox(width: w, height: h, length: l, chamferRadius: r)
+        b.chamferSegmentCount = 8
+        return b
+    }
+}
+
+/// The face, drawn like a pencil sketch: a few slightly wandering strokes per line, with graphite grain.
+enum Sketch {
+    static let eyeX: CGFloat = 6.6
+    static let eyeY: CGFloat = 82
+    private static let browY: CGFloat = 87.6
+    private static let noseY: CGFloat = 76.8
+    private static let mouthY: CGFloat = 72.4
+
+    private static var materials: [String: SCNMaterial] = [:]
+
+    static func material(eyes: Int, mouth: Int, brow: RGB, darkSkin: Bool) -> SCNMaterial {
+        let key = "\(eyes) \(mouth) \(brow.r) \(brow.g) \(brow.b) \(darkSkin)"
+        if let cached = materials[key] { return cached }
+        let m = SCNMaterial()
+        m.lightingModel = .constant
+        m.diffuse.contents = image(eyes: eyes, mouth: mouth, brow: brow, darkSkin: darkSkin)
+        m.diffuse.mipFilter = .linear
+        m.writesToDepthBuffer = false
+        m.blendMode = .alpha
+        materials[key] = m
+        return m
     }
 
-    // MARK: Outlines
+    private static func image(eyes: Int, mouth: Int, brow: RGB, darkSkin: Bool) -> UIImage {
+        let side: CGFloat = 512
+        let unit = side / (Character3D.Egg.faceX.upperBound - Character3D.Egg.faceX.lowerBound)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        var rng = SeededGenerator(seed: UInt64(eyes * 131 + mouth * 17 + 5))
 
-    private static func polygon(_ points: [(CGFloat, CGFloat)]) -> CGPath {
-        let path = CGMutablePath()
-        path.addLines(between: points.map { CGPoint(x: $0.0, y: $0.1) })
-        path.closeSubpath()
-        return path
-    }
-
-    /// A line of even thickness through the points, with square ends and pointed corners, as one outline.
-    private static func thickLine(_ points: [(CGFloat, CGFloat)], _ width: CGFloat) -> CGPath {
-        let p = points.map { SIMD2<Double>(Double($0.0), Double($0.1)) }
-        func side(_ a: SIMD2<Double>, _ b: SIMD2<Double>) -> SIMD2<Double> {
-            let d = simd_normalize(b - a)
-            return SIMD2(-d.y, d.x)
+        /// Face position in character units to a point on the drawing.
+        func at(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: (x - Character3D.Egg.faceX.lowerBound) * unit, y: (Character3D.Egg.faceY.upperBound - y) * unit)
         }
-        var left: [CGPoint] = [], right: [CGPoint] = []
-        for i in p.indices {
-            let before = i > 0 ? side(p[i - 1], p[i]) : side(p[i], p[i + 1])
-            let after = i < p.count - 1 ? side(p[i], p[i + 1]) : before
-            // At a corner the offset runs along the bisector, stretched so both edges keep their width.
-            let bisector = simd_normalize(before + after)
-            let offset = bisector * (Double(width) / 2 / max(0.3, simd_dot(bisector, before)))
-            left.append(CGPoint(x: p[i].x + offset.x, y: p[i].y + offset.y))
-            right.append(CGPoint(x: p[i].x - offset.x, y: p[i].y - offset.y))
+        func oval(_ cx: CGFloat, _ cy: CGFloat, _ rx: CGFloat, _ ry: CGFloat, from: CGFloat = 0, to: CGFloat = 2 * .pi, steps: Int = 18) -> [CGPoint] {
+            (0...steps).map { i in
+                let a = from + (to - from) * CGFloat(i) / CGFloat(steps)
+                return at(cx + cos(a) * rx, cy + sin(a) * ry)
+            }
         }
-        let path = CGMutablePath()
-        path.addLines(between: left + right.reversed())
-        path.closeSubpath()
-        return path
-    }
 
-    /// A rectangular frame: the outer edge with the middle cut out.
-    private static func frame(_ w: CGFloat, _ h: CGFloat, _ thickness: CGFloat) -> CGPath {
-        let path = CGMutablePath()
-        path.addRect(CGRect(x: -w / 2, y: -h / 2, width: w, height: h))
-        path.addRect(CGRect(x: -w / 2 + thickness, y: -h / 2 + thickness, width: w - 2 * thickness, height: h - 2 * thickness))
-        return path
-    }
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { context in
+            let cg = context.cgContext
+            let graphite = darkSkin ? UIColor(white: 0.05, alpha: 1) : UIColor(red: 0.22, green: 0.21, blue: 0.25, alpha: 1)
 
-    /// An arc drawn as a few straight pieces, so it stays angular.
-    private static func arcStroke(radius: CGFloat, from: CGFloat, to: CGFloat, width: CGFloat, steps: Int) -> CGPath {
-        thickLine((0...steps).map { i in
-            let a = from + (to - from) * CGFloat(i) / CGFloat(steps)
-            return (cos(a) * radius, sin(a) * radius)
-        }, width)
-    }
+            /// A pencil line: one firm stroke and a couple of lighter ones that wander off it slightly.
+            func pencil(_ points: [CGPoint], _ width: CGFloat, _ color: UIColor = graphite, strength: CGFloat = 1) {
+                for pass in 0..<3 {
+                    let wander: CGFloat = pass == 0 ? 0 : 0.11 * unit
+                    let moved = points.map {
+                        CGPoint(x: $0.x + .random(in: -wander...wander, using: &rng), y: $0.y + .random(in: -wander...wander, using: &rng))
+                    }
+                    let path = CGMutablePath()
+                    path.move(to: moved[0])
+                    if moved.count > 2 {
+                        for i in 1..<(moved.count - 1) {
+                            let mid = CGPoint(x: (moved[i].x + moved[i + 1].x) / 2, y: (moved[i].y + moved[i + 1].y) / 2)
+                            path.addQuadCurve(to: mid, control: moved[i])
+                        }
+                    }
+                    path.addLine(to: moved[moved.count - 1])
+                    cg.addPath(path)
+                    cg.setStrokeColor(color.withAlphaComponent((pass == 0 ? 0.92 : 0.4) * strength).cgColor)
+                    cg.setLineWidth(width * unit * (pass == 0 ? 1 : 0.55))
+                    cg.setLineCap(.round)
+                    cg.setLineJoin(.round)
+                    cg.strokePath()
+                }
+            }
+            func fill(_ points: [CGPoint], _ color: UIColor) {
+                cg.beginPath()
+                cg.addLines(between: points)
+                cg.closePath()
+                cg.setFillColor(color.cgColor)
+                cg.fillPath()
+            }
 
-    /// A flat outline given a little thickness.
-    private static func extrude(_ path: CGPath, _ depth: CGFloat) -> SCNShape {
-        let bezier = UIBezierPath(cgPath: path)
-        bezier.flatness = 0.05
-        bezier.usesEvenOddFillRule = true
-        return SCNShape(path: bezier, extrusionDepth: depth)
+            /// An open eye: the white, a sketched outline with a heavier upper lid, and a shaded-in pupil.
+            func openEye(_ x: CGFloat, _ rx: CGFloat, _ ry: CGFloat) {
+                fill(oval(x, eyeY, rx, ry), UIColor(white: 1, alpha: 0.94))
+                fill(oval(x, eyeY - ry * 0.08, rx * 0.5, ry * 0.62), graphite.withAlphaComponent(0.92))
+                fill(oval(x - rx * 0.2, eyeY + ry * 0.2, rx * 0.15, ry * 0.15), UIColor.white)
+                pencil(oval(x, eyeY, rx, ry), 0.6)
+                pencil(oval(x, eyeY, rx, ry, from: .pi * 0.08, to: .pi * 0.92, steps: 10), 1.05)
+            }
+            func closedEye(_ x: CGFloat) {
+                pencil(oval(x, eyeY - 1.4, 3.2, 3, from: .pi * 0.14, to: .pi * 0.86, steps: 10), 1)
+            }
+            switch eyes {
+            case 0:
+                openEye(-eyeX, 3.2, 3.4)
+                openEye(eyeX, 3.2, 3.4)
+            case 1:
+                openEye(-eyeX, 2.7, 4.2)
+                openEye(eyeX, 2.7, 4.2)
+            case 2:
+                for s: CGFloat in [-1, 1] {
+                    let x = s * eyeX
+                    fill(oval(x, eyeY + 0.4, 3.1, 3, from: .pi, to: 2 * .pi, steps: 12), UIColor(white: 1, alpha: 0.94))
+                    fill(oval(x, eyeY + 0.4, 1.5, 2.2, from: .pi, to: 2 * .pi, steps: 10), graphite.withAlphaComponent(0.92))
+                    pencil(oval(x, eyeY + 0.4, 3.1, 3, from: .pi, to: 2 * .pi, steps: 12), 0.55)
+                    pencil([at(x - 3.6, eyeY + 0.5), at(x, eyeY + 0.7), at(x + 3.6, eyeY + 0.4)], 1.05)
+                }
+            case 3:
+                closedEye(-eyeX)
+                closedEye(eyeX)
+            default:
+                openEye(-eyeX, 3.2, 3.4)
+                closedEye(eyeX)
+            }
+            if eyes != 3 {
+                let color = UIColor(cgColor: brow.cg())
+                for s: CGFloat in [-1, 1] {
+                    pencil([at(s * (eyeX - 3.5), browY - 0.3), at(s * eyeX, browY + 0.6), at(s * (eyeX + 3.5), browY - 0.2)], 1.25, darkSkin ? graphite : color)
+                }
+            }
+
+            pencil([at(-1.5, noseY + 0.8), at(-0.5, noseY - 0.3), at(0.9, noseY - 0.2), at(1.6, noseY + 0.7)], 0.6, graphite, strength: 0.8)
+
+            let inside = UIColor(red: 0.54, green: 0.2, blue: 0.25, alpha: 0.78)
+            switch mouth {
+            case 0:
+                pencil([at(-4.2, mouthY + 0.9), at(-2.3, mouthY - 0.5), at(0, mouthY - 0.9), at(2.3, mouthY - 0.5), at(4.2, mouthY + 0.9)], 0.85)
+            case 1:
+                let shape = [at(-4.4, mouthY + 1.2), at(4.4, mouthY + 1.2), at(3.4, mouthY - 1.4), at(0, mouthY - 2.6), at(-3.4, mouthY - 1.4)]
+                fill(shape, inside)
+                pencil(shape + [shape[0]], 0.7)
+            case 2:
+                pencil([at(-3.3, mouthY - 0.1), at(0, mouthY + 0.05), at(3.3, mouthY + 0.1)], 0.85)
+            case 3:
+                pencil([at(-3.6, mouthY - 0.4), at(-0.5, mouthY - 0.7), at(2.4, mouthY), at(4.1, mouthY + 1.4)], 0.85)
+            default:
+                fill(oval(0, mouthY - 0.2, 1.7, 2.1), inside)
+                pencil(oval(0, mouthY - 0.2, 1.7, 2.1), 0.65)
+            }
+
+            // A few short strokes of colour on each cheek.
+            let blush = UIColor(red: 0.86, green: 0.36, blue: 0.4, alpha: 1)
+            for s: CGFloat in [-1, 1] {
+                for k in 0..<3 {
+                    let x = s * (9.4 + CGFloat(k) * 1.1)
+                    pencil([at(x - 0.6, 76.2), at(x + 0.6, 77.8)], 0.45, blush, strength: 0.5)
+                }
+            }
+
+            // Graphite grain: tiny flecks rubbed out of everything drawn so far.
+            cg.setBlendMode(.destinationOut)
+            for _ in 0..<5200 {
+                let p = CGPoint(x: .random(in: 0...side, using: &rng), y: .random(in: 0...side, using: &rng))
+                let r = CGFloat.random(in: 0.5...1.5, using: &rng)
+                cg.setFillColor(UIColor(white: 0, alpha: .random(in: 0.12...0.4, using: &rng)).cgColor)
+                cg.fillEllipse(in: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+            }
+            cg.setBlendMode(.normal)
+        }
     }
 }
 

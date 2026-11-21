@@ -87,8 +87,9 @@ tools/          sim.sh, install.sh, make_music.py
 docs/           the design, the plan and the approved mockup
 ```
 
-The characters are low-poly 3D models built in code. To change how every one of them
-looks, edit `App/Passby/Draw/Character3D.swift`.
+The characters are 3D models built in code: a smooth egg-shaped head with a pencil-sketched
+face on a slim body. To change how every one of them looks, edit
+`App/Passby/Draw/Character3D.swift`.
 To change the tune, edit `tools/make_music.py` and run it.
 
 Tests: `swift test --package-path PassbyCore`
