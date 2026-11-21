@@ -8,11 +8,13 @@ struct CharacterView: View {
     var look: Look
     var crop: Crop = .full
     var animated = false
+    /// What they hold up. Only the live model shows it.
+    var holding: Holding?
 
     var body: some View {
         Group {
             if animated {
-                CharacterLiveView(look: look)
+                CharacterLiveView(look: look, holding: holding, art: HoldingArt.shared.version)
             } else {
                 GeometryReader { geo in
                     if geo.size.width > 0, geo.size.height > 0 {

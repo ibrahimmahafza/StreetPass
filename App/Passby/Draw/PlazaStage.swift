@@ -13,6 +13,9 @@ final class PlazaStage {
     private struct Figure {
         let node: SCNNode
         var look: Look
+        var holding: Holding?
+        /// Which round of fetched pictures the card was last drawn from.
+        var art = -1
     }
 
     private static let tile: CGFloat = 1.25
@@ -109,9 +112,10 @@ final class PlazaStage {
         let scale = Float(PlazaScene.characterHeight / 100)
         for actor in actors {
             var figure = figures[actor.id]
-            if figure == nil || figure?.look != actor.look {
+            // A different look, or starting or stopping holding something, means a new model.
+            if figure == nil || figure?.look != actor.look || (figure?.holding == nil) != (actor.holding == nil) {
                 figure?.node.removeFromParentNode()
-                let node = Character3D.make(actor.look)
+                let node = Character3D.make(actor.look, holding: actor.holding != nil)
                 node.scale = SCNVector3(scale, scale, scale)
                 node.addChildNode(Stage.shadow(radius: 15))
                 people.addChildNode(node)
@@ -119,6 +123,12 @@ final class PlazaStage {
                 figures[actor.id] = figure
             }
             guard let node = figure?.node else { continue }
+            // The card shows a plain picture until the real one has been fetched, then swaps to it.
+            if let holding = actor.holding, figure?.holding != holding || figure?.art != HoldingArt.shared.version {
+                Character3D.setCard(node, image: HoldingArt.shared.card(for: holding))
+                figures[actor.id]?.holding = holding
+                figures[actor.id]?.art = HoldingArt.shared.version
+            }
             node.position = SCNVector3(actor.x, 0, actor.z)
             node.eulerAngles.y = Float(actor.heading)
             Character3D.pose(node, walkPhase: actor.walkPhase.map { CGFloat($0) }, bounce: CGFloat(actor.bounce))
@@ -340,6 +350,10 @@ struct PlazaBackdrop: View {
 /// One character, live: it turns slowly from side to side and bobs, and rebuilds itself when its look changes.
 struct CharacterLiveView: UIViewRepresentable {
     var look: Look
+    /// What they hold up, if anything.
+    var holding: Holding?
+    /// Changes when a picture has been fetched, so the card is drawn again.
+    var art = 0
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -389,14 +403,23 @@ struct CharacterLiveView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         let coordinator = context.coordinator
-        guard coordinator.shown != look else { return }
-        coordinator.shown = look
-        coordinator.turntable.childNodes.forEach { $0.removeFromParentNode() }
-        coordinator.turntable.addChildNode(Character3D.make(look))
+        if coordinator.shown != look || (coordinator.holding == nil) != (holding == nil) || coordinator.turntable.childNodes.isEmpty {
+            coordinator.shown = look
+            coordinator.turntable.childNodes.forEach { $0.removeFromParentNode() }
+            coordinator.turntable.addChildNode(Character3D.make(look, holding: holding != nil))
+            coordinator.holding = nil
+        }
+        if let holding, let figure = coordinator.turntable.childNodes.first, coordinator.holding != holding || coordinator.art != art {
+            Character3D.setCard(figure, image: HoldingArt.shared.card(for: holding))
+        }
+        coordinator.holding = holding
+        coordinator.art = art
     }
 
     final class Coordinator {
         let turntable = SCNNode()
         var shown: Look?
+        var holding: Holding?
+        var art = -1
     }
 }

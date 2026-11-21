@@ -172,3 +172,24 @@ much nailed the bluetooth thing"). He asked for five changes.
     an app in the background at all is barely documented (iOS 18.4 added it for apps with an
     active Live Activity); the app logs whether it happens.
 
+## Pictures in their hands (2026-11-21)
+
+Achraf asked to "make someone hold like their favorite artist or most recent game in their
+hand", with a photo of the handheld's plaza for reference, and for the real Spotify and Steam
+connections. The idea is done with this app's own characters; nothing is copied from the photo.
+
+- A character holding something stands with both arms forward and a square card between the
+  hands (a second set of body meshes, `BodyMesh`), and keeps it there while walking.
+- The profile carries a short reference to the picture, not the picture: a Spotify image id
+  for an artist, a Steam app number for a game (`Holding` in PassbyCore). Each phone fetches
+  the picture itself and keeps it (`HoldingArt`). A reference that is not exactly the right
+  shape is dropped, so nothing a stranger's phone sends can make the app fetch from anywhere
+  but Spotify's and Steam's image hosts. Older builds ignore the new field.
+- Spotify login gives the top artist's picture; Steam gives the most recently played game.
+  Both need keys only Achraf can create (see the README), so they are untested. Without them:
+  a game typed by hand gets its cover from the Steam shop's public search when the name matches
+  exactly, and an artist typed by hand gets a plain card.
+- Claude's calls: the favourite artist is held if there is one, otherwise the game; the last
+  thing linked replaces it; the character sheet has a row to switch or hold nothing; people who
+  set up in an earlier build get a card for what they had already listed.
+

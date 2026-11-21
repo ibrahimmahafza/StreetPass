@@ -49,6 +49,7 @@ struct PlazaView: View {
         }
         .onAppear {
             scene.me = model.state.me?.look
+            scene.myHolding = model.state.me?.holding
             scene.sync(model.state.encounters)
             openDemoScreen()
         }
@@ -57,6 +58,9 @@ struct PlazaView: View {
         }
         .onChange(of: model.state.me?.look) { _, look in
             scene.me = look
+        }
+        .onChange(of: model.state.me?.holding) { _, holding in
+            scene.myHolding = holding
         }
     }
 

@@ -21,6 +21,8 @@ public final class PlazaScene {
         public var bounce: Double
         /// How far the head is tipped back to look up at the viewer, in radians.
         public var lookUp: Double
+        /// The picture they hold up in front of them, if any.
+        public var holding: Holding?
     }
 
     /// The green ring where new people wait.
@@ -38,6 +40,7 @@ public final class PlazaScene {
     private struct Walker {
         let id: UUID
         var look: Look
+        var holding: Holding?
         var spot = Spot(x: 0, z: 0)
         var goal = Spot(x: 0, z: 0)
         var heading = 0.0
@@ -98,6 +101,8 @@ public final class PlazaScene {
 
     /// Your own character's look. Nil until you have made one, and then there is nobody in the middle.
     public var me: Look?
+    /// What your own character holds up, if anything.
+    public var myHolding: Holding?
     /// The id your own character goes by among the actors.
     public let meID = UUID()
 
@@ -128,6 +133,7 @@ public final class PlazaScene {
         for e in encounters {
             if let i = walkers.firstIndex(where: { $0.id == e.id }) {
                 walkers[i].look = e.profile.look
+                walkers[i].holding = e.profile.holding
                 if e.waiting, walkers[i].mode == .wandering {
                     walkers[i].mode = .waiting
                     walkers[i].moving = false
@@ -138,7 +144,7 @@ public final class PlazaScene {
                 }
             } else {
                 var w = Walker(
-                    id: e.id, look: e.profile.look, wait: .random(in: 0...4, using: &rng),
+                    id: e.id, look: e.profile.look, holding: e.profile.holding, wait: .random(in: 0...4, using: &rng),
                     phase: .random(in: 0...6, using: &rng), mode: e.waiting ? .waiting : .wandering)
                 if !e.waiting { w.spot = startingSpot() }
                 w.heading = towardsViewer(from: w.spot)
@@ -427,7 +433,7 @@ public final class PlazaScene {
         var actors = walkers.map { w in
             var actor = Actor(
                 id: w.id, look: w.look, x: w.spot.x, z: w.spot.z, heading: w.heading, walkPhase: nil, bounce: 0,
-                lookUp: lookUp(from: w.spot, heading: w.heading))
+                lookUp: lookUp(from: w.spot, heading: w.heading), holding: w.holding)
             if w.stepping {
                 actor.walkPhase = w.phase
             } else if w.mode == .waiting {
@@ -441,7 +447,7 @@ public final class PlazaScene {
             let centre = home
             actors.append(Actor(
                 id: meID, look: me, x: centre.x, z: centre.z, heading: meHeading, walkPhase: nil, bounce: 0,
-                lookUp: lookUp(from: centre, heading: meHeading)))
+                lookUp: lookUp(from: centre, heading: meHeading), holding: myHolding))
         }
         return actors
     }

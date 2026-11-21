@@ -1,8 +1,9 @@
 import AuthenticationServices
 import CryptoKit
+import PassbyCore
 import UIKit
 
-/// Reads someone's top three artists from Spotify after they log in.
+/// Reads someone's top three artists from Spotify after they log in, and the top one's picture.
 /// Uses the PKCE flow, so no client secret is needed or stored.
 @MainActor
 enum SpotifyLink {
@@ -10,7 +11,13 @@ enum SpotifyLink {
 
     static let redirect = "passby://spotify"
 
-    static func topArtists() async throws -> [String] {
+    /// What a login found: the names, and the card for the favourite.
+    struct Found {
+        var names: [String]
+        var card: Holding?
+    }
+
+    static func topArtists() async throws -> Found {
         guard let clientID = Secrets.spotifyClientID else { throw Failure.notConfigured }
         let verifier = (0..<64).map { _ in String("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~".randomElement()!) }.joined()
         let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64EncodedString()
@@ -44,7 +51,14 @@ enum SpotifyLink {
 
         struct Token: Decodable { let access_token: String }
         struct Top: Decodable {
-            struct Artist: Decodable { let name: String }
+            struct Picture: Decodable {
+                let url: String
+                let width: Int?
+            }
+            struct Artist: Decodable {
+                let name: String
+                let images: [Picture]?
+            }
             let items: [Artist]
         }
         do {
@@ -53,9 +67,16 @@ enum SpotifyLink {
             var topRequest = URLRequest(url: URL(string: "https://api.spotify.com/v1/me/top/artists?limit=3&time_range=medium_term")!)
             topRequest.setValue("Bearer \(token.access_token)", forHTTPHeaderField: "Authorization")
             let (topData, _) = try await URLSession.shared.data(for: topRequest)
-            let names = try JSONDecoder().decode(Top.self, from: topData).items.map(\.name)
-            guard !names.isEmpty else { throw Failure.noAnswer }
-            return names
+            let artists = try JSONDecoder().decode(Top.self, from: topData).items
+            guard let favourite = artists.first else { throw Failure.noAnswer }
+            // Spotify offers each picture in a few sizes; the one nearest 320 across is plenty for a card.
+            // What is kept is the last part of its address, which is all another phone needs to fetch it.
+            let picture = (favourite.images ?? [])
+                .min { abs(($0.width ?? 640) - 320) < abs(($1.width ?? 640) - 320) }
+                .flatMap { URL(string: $0.url)?.lastPathComponent }
+                .flatMap { Holding.isPicture($0, for: .artist) ? $0 : nil }
+            note("links", "Spotify gave \(artists.count) artists\(picture == nil ? ", no usable picture" : " and a picture")")
+            return Found(names: artists.map(\.name), card: Holding(kind: .artist, title: favourite.name, picture: picture))
         } catch {
             throw Failure.noAnswer
         }

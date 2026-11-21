@@ -18,6 +18,10 @@ app; nothing here comes from the games that inspired it.
 - People in the plaza are solid and nobody is ever pushed: someone standing stays put, someone
   walking goes round whoever is in the way, turns before stepping and only steps forwards.
 - The plaza moves like a map: drag to slide it, pinch to zoom, twist two fingers to turn it.
+- Characters hold up a small square picture: their favourite artist (from a Spotify login) or
+  the game they played most recently (from Steam). Typed-in games get their cover looked up by
+  name; anything without a picture gets a plain card with a music note or a game pad. You
+  choose which to hold, or nothing, on your character sheet.
 - "Meet them": new people walk up one at a time with a card showing their name,
   Instagram, three artists, three games and how often you have passed.
 - A Live Activity that shows a green dot and count in the Dynamic Island, plus a green

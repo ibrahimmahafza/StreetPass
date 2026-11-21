@@ -24,8 +24,8 @@ struct SettingsSheet: View {
             }
         } else if let editing {
             BottomSheet(title: editing.name, onClose: { self.editing = nil }) {
-                LinkEntry(kind: editing, initial: editing == .spotify ? model.state.me?.artists ?? [] : model.state.me?.games ?? []) { items in
-                    model.setLinked(editing, items: items)
+                LinkEntry(kind: editing, initial: editing == .spotify ? model.state.me?.artists ?? [] : model.state.me?.games ?? []) { items, card in
+                    model.setLinked(editing, items: items, card: card)
                     self.editing = nil
                 }
             }

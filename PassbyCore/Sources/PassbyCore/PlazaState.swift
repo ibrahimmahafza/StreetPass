@@ -36,6 +36,10 @@ public struct PlazaState: Codable, Equatable, Sendable {
     public var soundsOn = true
     public var spotifyLinked = false
     public var steamLinked = false
+    /// The artist picture and the game picture you could hold, kept so you can switch between them.
+    /// Which one you are holding, if either, is `me.holding`.
+    public var artistCard: Holding?
+    public var gameCard: Holding?
 
     public init() {}
 

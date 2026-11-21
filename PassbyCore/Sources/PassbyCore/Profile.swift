@@ -10,8 +10,13 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
     public var artists: [String]
     public var games: [String]
     public var greeting: String
+    /// The picture their character holds up, if any.
+    public var holding: Holding?
 
-    public init(id: UUID, name: String, look: Look, instagram: String, artists: [String], games: [String], greeting: String) {
+    public init(
+        id: UUID, name: String, look: Look, instagram: String, artists: [String], games: [String], greeting: String,
+        holding: Holding? = nil
+    ) {
         self.id = id
         self.name = name
         self.look = look
@@ -19,6 +24,7 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
         self.artists = artists
         self.games = games
         self.greeting = greeting
+        self.holding = holding
     }
 
     /// The most a Bluetooth characteristic can hold.
@@ -41,10 +47,11 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
         p.games = Self.cleanList(games)
         p.greeting = Self.clean(greeting, maxBytes: Self.greetingBytes)
         p.look = look.clamped()
+        p.holding = holding?.normalized()
         return p
     }
 
-    private static func clean(_ text: String, maxBytes: Int) -> String {
+    static func clean(_ text: String, maxBytes: Int) -> String {
         let flat = text.split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
         var out = ""
         var used = 0
@@ -71,11 +78,14 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
         var data = encode(p)
         // Quotes and backslashes double in size once escaped, so shed the least important parts until it fits.
         let reductions: [(inout Profile) -> Void] = [
+            // With a picture to show, the name of what is held is the first thing to go.
+            { if $0.holding?.picture != nil { $0.holding?.title = "" } },
             { $0.greeting = "" },
             { $0.artists = Array($0.artists.prefix(2)); $0.games = Array($0.games.prefix(2)) },
             { $0.artists = Array($0.artists.prefix(1)); $0.games = Array($0.games.prefix(1)) },
             { $0.artists = []; $0.games = [] },
             { $0.instagram = "" },
+            { $0.holding = nil },
         ]
         for reduce in reductions where data.count > Self.maxWireBytes {
             reduce(&p)
@@ -90,8 +100,10 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
               let w = try? JSONDecoder().decode(Wire.self, from: wireData),
               w.v == 1, w.l.count == 7, let id = UUID(uuidString: w.i)
         else { return nil }
-        let p = Profile(id: id, name: w.n, look: Look(wire: w.l), instagram: w.g, artists: w.a, games: w.p, greeting: w.h)
-            .normalized()
+        let p = Profile(
+            id: id, name: w.n, look: Look(wire: w.l), instagram: w.g, artists: w.a, games: w.p, greeting: w.h,
+            holding: w.holding
+        ).normalized()
         guard !p.name.isEmpty else { return nil }
         self = p
     }
@@ -105,6 +117,29 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
         var a: [String]
         var p: [String]
         var h: String
+        /// What they hold: kind, title and, when there is one, the picture. Left out when they hold nothing.
+        /// Older builds ignore it. Anything unexpected here is read as "nothing" instead of spoiling the profile.
+        var k: [String]?
+
+        enum CodingKeys: String, CodingKey { case v, i, n, l, g, a, p, h, k }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            v = try c.decode(Int.self, forKey: .v)
+            i = try c.decode(String.self, forKey: .i)
+            n = try c.decode(String.self, forKey: .n)
+            l = try c.decode([Int].self, forKey: .l)
+            g = try c.decode(String.self, forKey: .g)
+            a = try c.decode([String].self, forKey: .a)
+            p = try c.decode([String].self, forKey: .p)
+            h = try c.decode(String.self, forKey: .h)
+            k = try? c.decodeIfPresent([String].self, forKey: .k)
+        }
+
+        var holding: Holding? {
+            guard let k, k.count >= 2, k.count <= 3, let kind = Holding.Kind(rawValue: k[0]) else { return nil }
+            return Holding(kind: kind, title: k[1], picture: k.count == 3 ? k[2] : nil)
+        }
 
         init(_ p: Profile) {
             v = 1
@@ -115,6 +150,7 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
             a = p.artists
             self.p = p.games
             h = p.greeting
+            k = p.holding.map { [$0.kind.rawValue, $0.title] + ($0.picture.map { [$0] } ?? []) }
         }
     }
 }

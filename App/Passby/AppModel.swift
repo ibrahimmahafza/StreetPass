@@ -98,6 +98,7 @@ final class AppModel {
         finder.onToken = { [weak self] token in self?.pass.update(token: token) }
         finder.onFix = { [weak self] in self?.pointIsland() }
         applySettings()
+        giveCardsToEarlierProfiles()
     }
 
     private func applySettings() {
@@ -190,23 +191,67 @@ final class AppModel {
 
     // MARK: You
 
-    func finishOnboarding(_ profile: Profile) {
+    func finishOnboarding(_ profile: Profile, artistCard: Holding? = nil, gameCard: Holding? = nil) {
         var s = state
-        s.me = profile.normalized()
+        var me = profile
+        // The favourite artist goes in their hands if there is one, otherwise the game.
+        me.holding = artistCard ?? gameCard
+        s.me = me.normalized()
         s.spotifyLinked = !profile.artists.isEmpty
         s.steamLinked = !profile.games.isEmpty
+        s.artistCard = artistCard?.normalized()
+        s.gameCard = gameCard?.normalized()
         state = s
+        findGameCover()
     }
 
-    func setLinked(_ kind: LinkEntry.Kind, items: [String]) {
+    /// Saves your artists or games. `card` is what goes in your character's hands for them.
+    func setLinked(_ kind: LinkEntry.Kind, items: [String], card: Holding? = nil) {
+        var s = state
         switch kind {
         case .spotify:
-            state.me?.artists = items
-            state.spotifyLinked = !items.isEmpty
+            s.me?.artists = items
+            s.spotifyLinked = !items.isEmpty
+            s.artistCard = card?.normalized()
         case .steam:
-            state.me?.games = items
-            state.steamLinked = !items.isEmpty
+            s.me?.games = items
+            s.steamLinked = !items.isEmpty
+            s.gameCard = card?.normalized()
         }
+        // What you just linked is what you hold. If you removed it, hold the other one if there is one.
+        s.me?.holding = card?.normalized() ?? (kind == .spotify ? s.gameCard : s.artistCard)
+        state = s
+        findGameCover()
+    }
+
+    /// Puts a card in your character's hands, or takes it away.
+    func hold(_ card: Holding?) {
+        state.me?.holding = card
+    }
+
+    /// A game typed in by hand has no cover yet. Look it up in the Steam shop by name, and if there
+    /// is an exact match, use its cover.
+    private func findGameCover() {
+        guard let card = state.gameCard, card.picture == nil, !card.title.isEmpty else { return }
+        Task { [weak self] in
+            guard let app = await SteamLink.app(named: card.title), let self, self.state.gameCard == card else { return }
+            var s = self.state
+            s.gameCard?.picture = app
+            if s.me?.holding == card { s.me?.holding?.picture = app }
+            self.state = s
+        }
+    }
+
+    /// People who set up before characters could hold things get a card for what they already listed.
+    private func giveCardsToEarlierProfiles() {
+        guard let me = state.me, me.holding == nil, state.artistCard == nil, state.gameCard == nil else { return }
+        var s = state
+        s.artistCard = me.artists.first.map { Holding(kind: .artist, title: $0, picture: nil) }
+        s.gameCard = me.games.first.map { Holding(kind: .game, title: $0, picture: nil) }
+        s.me?.holding = s.artistCard ?? s.gameCard
+        guard s != state else { return }
+        state = s
+        findGameCover()
     }
 
     /// One line under the Passing switch saying whether passing is working.
@@ -335,13 +380,31 @@ final class AppModel {
     private static let demoArtists = ["Daft Punk", "Stromae", "Tyler, The Creator", "Frank Ocean", "Kaytranada", "Gorillaz", "SZA", "Tame Impala", "Dua Lipa", "Radiohead", "Bad Bunny", "Charli xcx"]
     private static let demoGames = ["Hollow Knight", "Rocket League", "Stardew Valley", "Hades", "Terraria", "Elden Ring", "Celeste", "Portal 2", "Balatro", "Deep Rock Galactic", "Counter-Strike 2", "Slay the Spire"]
 
+    /// The Steam app number of each demo game, so demo people can hold a real cover.
+    private static let demoApps = [
+        "Hollow Knight": "367520", "Rocket League": "252950", "Stardew Valley": "413150", "Hades": "1145360",
+        "Terraria": "105600", "Elden Ring": "1245620", "Celeste": "504230", "Portal 2": "620", "Balatro": "2379780",
+        "Deep Rock Galactic": "548430", "Counter-Strike 2": "730", "Slay the Spire": "646570",
+    ]
+
     private func demoProfile(named name: String) -> Profile {
-        Profile(
+        var profile = Profile(
             id: UUID(), name: name, look: .random(using: &rng),
             instagram: "\(name.lowercased())\(Int.random(in: 10...98, using: &rng))",
             artists: Array(Self.demoArtists.shuffled(using: &rng).prefix(3)),
             games: Array(Self.demoGames.shuffled(using: &rng).prefix(3)),
             greeting: Self.demoGreetings.randomElement(using: &rng) ?? "Hi!")
+        // Most hold their game, with its real cover; some hold their artist, for whom there is no
+        // picture without a Spotify login; a few hold nothing.
+        switch Int.random(in: 0..<10, using: &rng) {
+        case 0..<6:
+            profile.holding = profile.games.first.map { Holding(kind: .game, title: $0, picture: Self.demoApps[$0]) }
+        case 6..<9:
+            profile.holding = profile.artists.first.map { Holding(kind: .artist, title: $0, picture: nil) }
+        default:
+            break
+        }
+        return profile
     }
 
     private func seed(for demo: String) {
@@ -354,6 +417,9 @@ final class AppModel {
             id: UUID(), name: "You", look: Look(skin: 1, hair: 1, hairColor: 0, eyes: 0, mouth: 0, hoodie: 5, extra: 3),
             instagram: "you", artists: ["Stromae", "Kaytranada", "SZA"], games: ["Hades", "Celeste", "Balatro"],
             greeting: "Hi, I'm new here!")
+        s.artistCard = Holding(kind: .artist, title: "Stromae", picture: nil)
+        s.gameCard = Holding(kind: .game, title: "Hades", picture: Self.demoApps["Hades"])
+        s.me?.holding = s.gameCard
         s.spotifyLinked = true
         let now = Date()
         for (i, name) in Self.demoNames.prefix(14).enumerated() {

@@ -6,6 +6,7 @@ import UIKit
 ///
 /// The surface is defined by a distance field (how far any point is from the body) and turned into
 /// a mesh once per step of the walk. Every character shares those meshes; only the colours differ.
+/// There are two sets: arms swinging at the sides, and arms bent forward to hold a picture up.
 enum BodyMesh {
     static let frameCount = 12
     static let legSwing: Float = 0.6
@@ -17,9 +18,13 @@ enum BodyMesh {
     private static let legLength: Float = 31.5
     private static let armLength: Float = 23.5
 
+    /// Where the picture someone holds sits, and how big it is. The hands close on its two sides.
+    static let cardCentre = SIMD3<Float>(0, 48, 15.6)
+    static let cardSide: Float = 23
+
     private static let lock = NSLock()
     private static var built: [Int: SCNGeometry] = [:]
-    private static var building = false
+    private static var building: Set<Bool> = []
 
     /// The step of the walk nearest to a phase, and how far the limbs swing in it (-1...1).
     static func frame(for phase: CGFloat) -> Int {
@@ -31,26 +36,28 @@ enum BodyMesh {
         sin(Float(frame) / Float(frameCount) * 2 * .pi)
     }
 
-    /// The mesh for a step of the walk; frame 0 is also standing still. The standing mesh is made on
-    /// first use and the rest follow in the background, so nil means "not ready yet, use frame 0".
-    static func geometry(frame: Int) -> SCNGeometry? {
+    /// The mesh for a step of the walk; frame 0 is also standing still. `holding` picks the set with
+    /// the arms bent forward. The standing mesh is made on first use and the rest follow in the
+    /// background, so nil means "not ready yet, use frame 0".
+    static func geometry(frame: Int, holding: Bool = false) -> SCNGeometry? {
+        let first = holding ? frameCount : 0
         lock.lock()
         defer { lock.unlock() }
-        if built[0] == nil {
-            built[0] = build(swing: 0)
+        if built[first] == nil {
+            built[first] = build(swing: 0, holding: holding)
         }
-        if !building {
-            building = true
+        if !building.contains(holding) {
+            building.insert(holding)
             DispatchQueue.global(qos: .userInitiated).async {
                 for k in 1..<frameCount {
-                    let mesh = build(swing: swing(k))
+                    let mesh = build(swing: swing(k), holding: holding)
                     lock.lock()
-                    built[k] = mesh
+                    built[first + k] = mesh
                     lock.unlock()
                 }
             }
         }
-        return built[frame]
+        return built[first + frame]
     }
 
     /// A material that dresses the mesh in a hoodie colour, a trouser colour and a skin colour.
@@ -87,22 +94,33 @@ enum BodyMesh {
     /// Where the limbs are for one step of the walk.
     private struct Rig {
         var shoulder: [SIMD3<Float>] = []
+        var elbow: [SIMD3<Float>] = []
         var wrist: [SIMD3<Float>] = []
         var hand: [SIMD3<Float>] = []
         var hip: [SIMD3<Float>] = []
         var ankle: [SIMD3<Float>] = []
 
-        init(swing: Float) {
+        init(swing: Float, holding: Bool) {
             func turn(_ v: SIMD3<Float>, _ angle: Float) -> SIMD3<Float> {
                 SIMD3(v.x, v.y * cos(angle) - v.z * sin(angle), v.y * sin(angle) + v.z * cos(angle))
             }
             for s: Float in [-1, 1] {
                 // Arms hang down and a little outwards, and swing against the leg on the same side.
-                let arm = turn(SIMD3(sin(s * armSpread), -cos(s * armSpread), 0), s * swing * armSwing)
                 let top = SIMD3<Float>(s * 12.4, 63, 0)
                 shoulder.append(top)
-                wrist.append(top + arm * armLength)
-                hand.append(top + arm * (armLength + 1.8))
+                if holding {
+                    // Elbows tucked in, forearms forward, a hand on each side of the picture. The arms
+                    // stay put while the legs walk.
+                    let grip = cardCentre + SIMD3(s * (cardSide / 2 + 0.4), -0.4, -1.2)
+                    elbow.append(SIMD3(s * 14.6, 51, 3.2))
+                    wrist.append(grip + SIMD3(s * 0.9, 0.3, -1.6))
+                    hand.append(grip)
+                } else {
+                    let arm = turn(SIMD3(sin(s * armSpread), -cos(s * armSpread), 0), s * swing * armSwing)
+                    elbow.append(top + arm * (armLength / 2))
+                    wrist.append(top + arm * armLength)
+                    hand.append(top + arm * (armLength + 1.8))
+                }
                 let leg = turn(SIMD3(0, -1, 0), -s * swing * legSwing)
                 let joint = SIMD3<Float>(s * hipX, hipY, 0)
                 hip.append(joint)
@@ -139,7 +157,7 @@ enum BodyMesh {
         var distance = blend(blend(chest, shoulders, 4), hood, 3)
         var arms = Float.infinity, hands = Float.infinity, limbs = Float.infinity
         for i in 0..<2 {
-            let arm = rod(p, rig.shoulder[i], rig.wrist[i], 3.9, 3.3)
+            let arm = min(rod(p, rig.shoulder[i], rig.elbow[i], 3.9, 3.6), rod(p, rig.elbow[i], rig.wrist[i], 3.6, 3.3))
             distance = blend(distance, arm, 3.6)
             arms = min(arms, arm)
             let hand = simd_length(p - rig.hand[i]) - 4.9
@@ -165,8 +183,8 @@ enum BodyMesh {
     /// The space around the body is cut into small cubes. Every cube the surface passes through gets
     /// one corner of the mesh, placed where the surface crosses the cube's edges, and neighbouring
     /// corners are joined into faces.
-    private static func build(swing: Float) -> SCNGeometry {
-        let rig = Rig(swing: swing)
+    private static func build(swing: Float, holding: Bool) -> SCNGeometry {
+        let rig = Rig(swing: swing, holding: holding)
         let cell: Float = 1.15
         let low = SIMD3<Float>(-32, 3, -22)
         let nx = 56, ny = 62, nz = 39
@@ -259,18 +277,20 @@ enum BodyMesh {
 /// copy of each so it can wear its own colours.
 final class BodyShape: SCNNode {
     private var outfit = SCNMaterial()
+    private var holding = false
     private var copies: [Int: SCNGeometry] = [:]
     private var shown = -1
 
-    convenience init(material: SCNMaterial) {
+    convenience init(material: SCNMaterial, holding: Bool = false) {
         self.init()
         outfit = material
+        self.holding = holding
         show(0)
     }
 
     func show(_ frame: Int) {
         if frame == shown, copies[frame] != nil { return }
-        if copies[frame] == nil, let mesh = BodyMesh.geometry(frame: frame)?.copy() as? SCNGeometry {
+        if copies[frame] == nil, let mesh = BodyMesh.geometry(frame: frame, holding: holding)?.copy() as? SCNGeometry {
             mesh.firstMaterial = outfit
             copies[frame] = mesh
         }

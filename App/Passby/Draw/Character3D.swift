@@ -9,10 +9,11 @@ import UIKit
 enum Character3D {
     /// Node names used by `pose`.
     private enum Part {
-        static let body = "body", shape = "shape", legLeft = "legL", legRight = "legR", head = "head"
+        static let body = "body", shape = "shape", legLeft = "legL", legRight = "legR", head = "head", card = "card"
     }
 
-    static func make(_ rawLook: Look) -> SCNNode {
+    /// With `holding`, the arms come forward and hold a square card; give it a picture with `setCard`.
+    static func make(_ rawLook: Look, holding: Bool = false) -> SCNNode {
         let look = rawLook.clamped()
         let skin = Palette.skin[look.skin]
         let top = Palette.hoodie[look.hoodie]
@@ -25,9 +26,24 @@ enum Character3D {
         root.addChildNode(body)
 
         // The body is one continuous surface: hoodie, arms, hands and legs with no joins.
-        let shape = BodyShape(material: BodyMesh.material(top: top, legs: pants, skin: skin))
+        let shape = BodyShape(material: BodyMesh.material(top: top, legs: pants, skin: skin), holding: holding)
         shape.name = Part.shape
         body.addChildNode(shape)
+
+        if holding {
+            // The picture: a thin white card held between the hands, tipped back a little so it shows from above.
+            let side = CGFloat(BodyMesh.cardSide)
+            let card = SCNNode(geometry: SCNBox(width: side, height: side, length: 1.4, chamferRadius: 1))
+            let front = SCNMaterial()
+            front.lightingModel = .lambert
+            front.diffuse.contents = UIColor.white
+            let edge = material(RGB(0xFFFFFF))
+            card.geometry?.materials = [front, edge, edge, edge, edge, edge]
+            card.name = Part.card
+            card.simdPosition = BodyMesh.cardCentre
+            card.eulerAngles.x = -0.28
+            body.addChildNode(card)
+        }
 
         // Trainers hang from pivots at the hips, so they swing with the legs of the surface above them.
         let hipX = CGFloat(BodyMesh.hipX), hipY = CGFloat(BodyMesh.hipY)
@@ -73,6 +89,15 @@ enum Character3D {
     }
 
     private static let neckHeight: CGFloat = 66
+
+    /// Puts a picture on the front of the card a character holds. Does nothing if they hold none.
+    static func setCard(_ node: SCNNode, image: UIImage) {
+        guard let front = node.childNode(withName: Part.card, recursively: true)?.geometry?.materials.first else { return }
+        front.diffuse.contents = image
+        // Lit by the scene like everything else, with a little of its own light so it stays readable in shade.
+        front.emission.contents = image
+        front.emission.intensity = 0.3
+    }
 
     /// Tips the head back by `angle` radians so the face looks up, towards a camera above.
     static func lookUp(_ node: SCNNode, by angle: Float) {

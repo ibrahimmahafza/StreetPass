@@ -231,4 +231,23 @@ final class PlazaSceneTests: XCTestCase {
         let end = try XCTUnwrap(scene.actors(time: 0).first { $0.id == id })
         XCTAssertGreaterThan(hypot(end.x - start.x, end.z - start.z), 0.5)
     }
+
+    // MARK: In their hands
+
+    func testPeopleAndYouCarryWhatTheyAreHolding() throws {
+        let scene = PlazaScene(seed: 1)
+        scene.me = look
+        scene.myHolding = Holding(kind: .artist, title: "Stromae", picture: nil)
+        var someone = person(1)
+        someone.profile.holding = Holding(kind: .game, title: "Hades", picture: "1145360")
+        scene.sync([someone, person(2)])
+        let actors = scene.actors(time: 0)
+        XCTAssertEqual(actors.first { $0.id == someone.id }?.holding, someone.profile.holding)
+        XCTAssertEqual(try XCTUnwrap(actors.first { $0.id == scene.meID }).holding, scene.myHolding)
+        XCTAssertNil(try XCTUnwrap(actors.first { $0.id != someone.id && $0.id != scene.meID }).holding)
+        // Linking something later shows up without anyone being replaced.
+        someone.profile.holding = Holding(kind: .artist, title: "SZA", picture: nil)
+        scene.sync([someone, person(2)])
+        XCTAssertEqual(scene.actors(time: 0).first { $0.id == someone.id }?.holding?.title, "SZA")
+    }
 }

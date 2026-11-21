@@ -11,6 +11,8 @@ struct OnboardingView: View {
     @State private var instagram = ""
     @State private var artists: [String] = []
     @State private var games: [String] = []
+    @State private var artistCard: Holding?
+    @State private var gameCard: Holding?
     @State private var linking: LinkEntry.Kind?
     @FocusState private var typing: Bool
     /// The empty plaza behind the panel.
@@ -71,8 +73,14 @@ struct OnboardingView: View {
             }
             .frame(minHeight: 34)
             if let linking {
-                LinkEntry(kind: linking, initial: linking == .spotify ? artists : games) { items in
-                    if linking == .spotify { artists = items } else { games = items }
+                LinkEntry(kind: linking, initial: linking == .spotify ? artists : games) { items, card in
+                    if linking == .spotify {
+                        artists = items
+                        artistCard = card
+                    } else {
+                        games = items
+                        gameCard = card
+                    }
                     self.linking = nil
                 }
             } else {
@@ -190,6 +198,7 @@ struct OnboardingView: View {
         model.finishOnboarding(
             Profile(
                 id: UUID(), name: trimmedName, look: look, instagram: instagram, artists: artists, games: games,
-                greeting: "Hi, I'm \(trimmedName)!"))
+                greeting: "Hi, I'm \(trimmedName)!"),
+            artistCard: artistCard, gameCard: gameCard)
     }
 }
