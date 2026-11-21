@@ -7,10 +7,22 @@ struct SettingsSheet: View {
 
     @State private var editing: LinkEntry.Kind?
     @State private var confirmingForget = false
+    @State private var showingLog = false
 
     var body: some View {
+        content.onAppear {
+            if model.demo == "diagnostics" { showingLog = true }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         @Bindable var model = model
-        if let editing {
+        if showingLog {
+            BottomSheet(title: "Diagnostics", onClose: { showingLog = false }) {
+                DiagnosticsList()
+            }
+        } else if let editing {
             BottomSheet(title: editing.name, onClose: { self.editing = nil }) {
                 LinkEntry(kind: editing, initial: editing == .spotify ? model.state.me?.artists ?? [] : model.state.me?.games ?? []) { items in
                     model.setLinked(editing, items: items)
@@ -66,6 +78,11 @@ struct SettingsSheet: View {
                 Text("Simulate a pass is for demos and the simulator, where Bluetooth is unavailable. Forget everyone empties the plaza so the same phones can pass again.")
                     .font(Theme.font(12.5))
                     .foregroundStyle(Theme.soft)
+                Button("Diagnostics") { showingLog = true }
+                    .font(Theme.font(13.5, .bold))
+                    .foregroundStyle(Theme.link)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 2)
             }
         }
     }
@@ -103,6 +120,58 @@ struct SettingsSheet: View {
             }
             .padding(.vertical, 10)
             Divider().overlay(Theme.line)
+        }
+    }
+}
+
+/// The running record of what Bluetooth, ranging and the island did, newest at the bottom.
+struct DiagnosticsList: View {
+    private var log: Diagnostics { Diagnostics.shared }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(log.lines.enumerated()), id: \.offset) { index, line in
+                            Text(line)
+                                .font(.system(size: 10.5, design: .monospaced))
+                                .foregroundStyle(Theme.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .id(index)
+                        }
+                    }
+                    .padding(10)
+                }
+                .frame(height: 380)
+                .background(Theme.fill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .onAppear { proxy.scrollTo(log.lines.count - 1, anchor: .bottom) }
+                .onChange(of: log.lines.count) { _, count in proxy.scrollTo(count - 1, anchor: .bottom) }
+            }
+            if log.lines.isEmpty {
+                Text("Nothing recorded yet.")
+                    .font(Theme.font(13))
+                    .foregroundStyle(Theme.soft)
+            }
+            HStack(spacing: 8) {
+                ShareLink(item: log.text) {
+                    Text("Share")
+                        .font(Theme.font(16, .bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(LinearGradient(colors: [.white, Color(hex: 0xF6F8F9)], startPoint: .top, endPoint: .bottom))
+                                .shadow(color: Color(hex: 0xDFE5E9), radius: 0, y: 2)
+                        )
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
+                }
+                .disabled(log.lines.isEmpty)
+                Button("Clear") { log.clear() }
+                    .buttonStyle(PlainButtonStyleWhite())
+                    .disabled(log.lines.isEmpty)
+            }
         }
     }
 }

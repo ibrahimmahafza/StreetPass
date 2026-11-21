@@ -23,6 +23,8 @@ final class NearbyFinder: NSObject {
 
     @ObservationIgnored private var session: NISession?
     @ObservationIgnored private var demo: Timer?
+    @ObservationIgnored private var lastLogged = Date.distantPast
+    @ObservationIgnored private var fixes = 0
 
     /// Apple's documentation gives the camera-assisted angle in radians but does not say which way is
     /// positive. This assumes positive is to the right, like the direction vector; flip it if the arrow
@@ -36,20 +38,35 @@ final class NearbyFinder: NSObject {
 
     /// Gets a session and its token ready, so a phone that reads the token can start ranging at once.
     func prepare() {
-        guard session == nil, Self.canRange else { return }
+        guard session == nil else { return }
+        let can = NISession.deviceCapabilities
+        guard Self.canRange else {
+            if !saidCannot {
+                saidCannot = true
+                note("ranging", "this device cannot range (no Ultra Wideband)")
+            }
+            return
+        }
         let fresh = NISession()
         fresh.delegate = self
         fresh.delegateQueue = .main
         session = fresh
-        onToken?(fresh.discoveryToken.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) })
+        let token = fresh.discoveryToken.flatMap { try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true) }
+        note("ranging", "ready; token \(token?.count ?? 0) bytes; direction from the chip: \(can.supportsDirectionMeasurement ? "yes" : "no"), with the camera: \(can.supportsCameraAssistance ? "yes" : "no")")
+        onToken?(token)
     }
+
+    @ObservationIgnored private var saidCannot = false
 
     /// Starts ranging with the phone that handed over this token.
     func find(peer tokenData: Data) {
         prepare()
         guard let session,
               let token = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NIDiscoveryToken.self, from: tokenData)
-        else { return }
+        else {
+            note("ranging", session == nil ? "cannot range with them: this phone has no session" : "cannot range with them: their token (\(tokenData.count) bytes) is unreadable")
+            return
+        }
         let configuration = NINearbyPeerConfiguration(peerToken: token)
         // Phones that cannot measure direction with the chip alone can with the camera's help.
         // That asks for camera access, so it is only switched on where it is needed.
@@ -57,6 +74,8 @@ final class NearbyFinder: NSObject {
         if !can.supportsDirectionMeasurement, can.supportsCameraAssistance {
             configuration.isCameraAssistanceEnabled = true
         }
+        fixes = 0
+        note("ranging", "started ranging\(configuration.isCameraAssistanceEnabled ? " with the camera's help" : "")")
         session.run(configuration)
     }
 
@@ -64,6 +83,7 @@ final class NearbyFinder: NSObject {
     func stop() {
         demo?.invalidate()
         demo = nil
+        if session != nil, fixes > 0 { note("ranging", "stopped after \(fixes) readings") }
         session?.invalidate()
         session = nil
         bearing = nil
@@ -100,6 +120,14 @@ extension NearbyFinder: NISessionDelegate {
             } else {
                 bearing = nil
             }
+            fixes += 1
+            // The first reading and then one every couple of seconds, so the log stays readable.
+            if fixes == 1 || Date().timeIntervalSince(lastLogged) >= 2 {
+                lastLogged = Date()
+                let far = distance.map { String(format: "%.2f m", $0) } ?? "distance unknown"
+                let way = bearing.map { String(format: "%.0f degrees to the right", $0 * 180 / .pi) } ?? "direction unknown"
+                note("ranging", "\(fixes == 1 ? "first reading" : "reading \(fixes)"): \(far), \(way)")
+            }
             onFix?()
         }
     }
@@ -107,20 +135,30 @@ extension NearbyFinder: NISessionDelegate {
     nonisolated func session(_ session: NISession, didRemove nearbyObjects: [NINearbyObject], reason: NINearbyObject.RemovalReason) {
         MainActor.assumeIsolated {
             guard session === self.session else { return }
+            note("ranging", "lost them (\(reason == .timeout ? "timed out" : "they stopped"))")
             bearing = nil
             distance = nil
             onFix?()
         }
     }
 
+    nonisolated func sessionWasSuspended(_ session: NISession) {
+        MainActor.assumeIsolated { note("ranging", "paused by iOS (app not in front)") }
+    }
+
+    nonisolated func sessionSuspensionEnded(_ session: NISession) {
+        MainActor.assumeIsolated { note("ranging", "iOS allows ranging again") }
+    }
+
     nonisolated func session(_ session: NISession, didUpdateAlgorithmConvergence convergence: NIAlgorithmConvergence, for object: NINearbyObject?) {
         MainActor.assumeIsolated {
             guard session === self.session else { return }
-            if case .converged = convergence.status {
-                needsSweep = false
-            } else {
-                needsSweep = true
+            let settled: Bool
+            if case .converged = convergence.status { settled = true } else { settled = false }
+            if needsSweep == settled {
+                note("ranging", settled ? "direction has settled" : "direction not settled yet; the phone needs moving around")
             }
+            needsSweep = !settled
         }
     }
 
@@ -128,6 +166,7 @@ extension NearbyFinder: NISessionDelegate {
         MainActor.assumeIsolated {
             // Refused permission, or the system took the chip away. Drop the session; a new one is made next time.
             guard session === self.session else { return }
+            note("ranging", "session ended: \(error.localizedDescription)")
             self.session = nil
             bearing = nil
             distance = nil

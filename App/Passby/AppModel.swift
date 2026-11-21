@@ -71,6 +71,8 @@ final class AppModel {
         try? store.save(state)
         audio.muted = arguments.contains("-mute")
         audioCheck = arguments.contains("-audiocheck")
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        note("app", "launched, version \(version); profile \(state.me == nil ? "not set up" : "set"), passing \(state.passingOn ? "on" : "off"), \(state.encounters.count) people")
         pass.onProfile = { [weak self] profile, token in self?.handlePass(profile, token: token) }
         pass.onStatus = { [weak self] status in self?.passStatus = status }
         finder.onToken = { [weak self] token in self?.pass.update(token: token) }
@@ -121,6 +123,7 @@ final class AppModel {
             return
         }
         audio.setForeground(active)
+        if onScreen != active { note("app", active ? "app in front" : "app left the screen") }
         onScreen = active
         // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
         if active, let meeting, meeting.until <= Date() {
@@ -211,7 +214,9 @@ final class AppModel {
     /// A phone running the app was just detected. `token` lets this phone range with it, if both can.
     func handlePass(_ profile: Profile, token: Data? = nil) {
         // Someone seen again inside the cooldown is not a new pass, so nothing is announced.
-        guard state.recordPass(profile, at: Date()) != .ignored else { return }
+        let outcome = state.recordPass(profile, at: Date())
+        note("app", "pass from \(profile.name): \(outcome == .new ? "new person" : outcome == .again ? "passed again" : "already counted, nothing announced")\(token == nil ? "; no ranging token" : "")")
+        guard outcome != .ignored else { return }
         audio.jingle()
         beginMeeting(with: profile, token: token)
     }
@@ -236,6 +241,7 @@ final class AppModel {
         meetingEnd?.cancel()
         meetingEnd = nil
         guard meeting != nil else { return }
+        note("app", "the 15 seconds are up")
         meeting = nil
         finder.stop()
         syncIsland()
@@ -292,7 +298,7 @@ final class AppModel {
                 s.encounters[j].times = Int.random(in: 1...6, using: &rng)
             }
         }
-        if !["plaza", "gallery", "icon", "meet"].contains(demo) {
+        if !["plaza", "gallery", "icon", "meet", "diagnostics"].contains(demo) {
             var lina = demoProfile(named: "Lina")
             lina.look = Look(skin: 2, hair: 3, hairColor: 1, eyes: 0, mouth: 0, hoodie: 7, extra: 0)
             lina.instagram = "lina.mtl"

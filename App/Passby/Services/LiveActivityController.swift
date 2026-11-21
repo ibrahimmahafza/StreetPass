@@ -18,6 +18,7 @@ final class LiveActivityController {
 
     private var activity: Activity<PassActivityAttributes>?
     private var shown: PassActivityAttributes.ContentState?
+    private var saidOff = false
 
     /// False when Live Activities are switched off for the app in iOS Settings.
     var allowed: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
@@ -32,6 +33,10 @@ final class LiveActivityController {
             shown = nil
         }
         guard wanted, allowed else {
+            if wanted, !saidOff {
+                saidOff = true
+                note("island", "Live Activities are switched off for this app in iOS Settings")
+            }
             end()
             return
         }
@@ -46,10 +51,16 @@ final class LiveActivityController {
             let announce: AlertConfiguration? = alert
                 ? meeting.map { AlertConfiguration(title: "Time to meet someone new", body: "\($0.name) is nearby", sound: .default) }
                 : nil
+            if announce != nil { note("island", "announcing \(meeting?.name ?? "someone") on the island") }
             Task { await activity.update(content, alertConfiguration: announce) }
         } else if canStart {
-            activity = try? Activity.request(attributes: PassActivityAttributes(), content: content, pushType: nil)
-            shown = activity == nil ? nil : state
+            do {
+                activity = try Activity.request(attributes: PassActivityAttributes(), content: content, pushType: nil)
+                shown = state
+                note("island", "Live Activity started")
+            } catch {
+                note("island", "could not start the Live Activity: \(error.localizedDescription)")
+            }
         }
     }
 

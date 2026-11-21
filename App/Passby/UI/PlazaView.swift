@@ -191,7 +191,7 @@ struct PlazaView: View {
         case "card": beginArrival(instantly: true)
         case "me": sheet = .me
         case "people": sheet = .people
-        case "settings": sheet = .settings
+        case "settings", "diagnostics": sheet = .settings
         default: break
         }
     }
