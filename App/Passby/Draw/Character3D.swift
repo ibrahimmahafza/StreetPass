@@ -12,7 +12,7 @@ enum Character3D {
         static let body = "body", legLeft = "legL", legRight = "legR", armLeft = "armL", armRight = "armR"
     }
 
-    private static let armSpread: Float = 0.26
+    private static let armSpread: Float = 0.36
 
     static func make(_ rawLook: Look) -> SCNNode {
         let look = rawLook.clamped()
@@ -30,16 +30,17 @@ enum Character3D {
         for s: CGFloat in [-1, 1] {
             let leg = SCNNode()
             leg.name = s < 0 ? Part.legLeft : Part.legRight
-            leg.position = SCNVector3(s * 5.2, 40, 0)
+            leg.position = SCNVector3(s * 5.9, 40, 0)
             body.addChildNode(leg)
-            put(SCNCapsule(capRadius: 3.8, height: 32), pants, 0, -16, 0, in: leg)
+            put(SCNCapsule(capRadius: 4, height: 32), pants, 0, -16, 0, in: leg)
             put(box(9.4, 6.4, 17, 3), RGB(0xF4F6F9), 0, -35.8, 2.8, in: leg)
             put(box(9.8, 2, 17.4, 1), RGB(0xAEBAC8), 0, -39, 2.8, in: leg)
             put(box(4.4, 1.8, 5.4, 0.8), top, 0, -32.4, 6, in: leg)
         }
 
-        // Hoodie: body, hem, pocket, drawstrings, and the hood resting behind the neck.
+        // Hoodie: body, shoulders that slope down into the arms, hem, pocket, drawstrings, and the hood behind the neck.
         put(SCNCapsule(capRadius: 11.4, height: 33), top, 0, 54.5, 0, in: body).scale = SCNVector3(1, 1, 0.74)
+        put(SCNSphere(radius: 1), top, 0, 64, 0, in: body).scale = SCNVector3(15.2, 5.8, 8.4)
         put(SCNTorus(ringRadius: 10.4, pipeRadius: 1.7), top.mix(-0.1), 0, 40.8, 0, in: body).scale = SCNVector3(1, 1, 0.74)
         put(box(12.5, 6.2, 2.4, 1.2), top.mix(-0.09), 0, 46.5, 7.5, in: body)
         for s: CGFloat in [-1, 1] {
@@ -51,11 +52,11 @@ enum Character3D {
         for s: CGFloat in [-1, 1] {
             let arm = SCNNode()
             arm.name = s < 0 ? Part.armLeft : Part.armRight
-            arm.position = SCNVector3(s * 11.2, 63.5, 0)
+            arm.position = SCNVector3(s * 12.6, 63.2, 0)
             arm.eulerAngles.z = Float(s) * armSpread
             body.addChildNode(arm)
-            put(SCNCapsule(capRadius: 3.4, height: 27), top, 0, -12.5, 0, in: arm)
-            put(SCNSphere(radius: 4.2), skin, 0, -25.6, 0, in: arm)
+            put(SCNCapsule(capRadius: 3.6, height: 27), top, 0, -12.5, 0, in: arm)
+            put(SCNSphere(radius: 4.8), skin, 0, -26, 0, in: arm)
         }
 
         // Head: the egg, ears, and the sketched face laid over its front.
