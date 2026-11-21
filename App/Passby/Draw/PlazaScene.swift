@@ -4,6 +4,9 @@ import PassbyCore
 
 /// Who is where in the plaza and what they are doing. It knows nothing about drawing:
 /// `PlazaStage` turns its actors into 3D models every frame.
+///
+/// Everyone is a solid circle on the floor. Walkers steer round each other, nobody can overlap,
+/// and people turn to face where they are going before they step. Standing still, they face the viewer.
 final class PlazaScene {
     /// One person as the stage should show them this frame.
     struct Actor {
@@ -15,6 +18,8 @@ final class PlazaScene {
         var heading: Double
         var walkPhase: CGFloat?
         var bounce: CGFloat
+        /// How far the head is tipped back to look up at the viewer, in radians.
+        var lookUp: Float
     }
 
     /// The green ring where new people wait.
@@ -39,12 +44,20 @@ final class PlazaScene {
         var heading = 0.0
         var wait: Double
         var phase: Double
+        /// On the way somewhere (wandering only; arriving people are always on their way).
         var moving = false
+        /// Actually taking steps this frame, as opposed to turning on the spot first.
+        var stepping = false
+        /// How long the current walk has lasted and when to give up on it.
+        var walked = 0.0
+        var patience = 0.0
         var mode: Mode
     }
 
     /// Height of a character in floor units.
     static let characterHeight = 2.9
+    /// The circle of floor each person takes up.
+    private static let bodyRadius = 0.85
     private static let ringRadius = 3.8
     private static let walkSpeed = 1.9
     private static let arrivalSpeed = 9.0
@@ -55,7 +68,7 @@ final class PlazaScene {
     private static let ringV = 0.755
     private static let greetV = 0.585
 
-    /// The camera the stage is using. People are placed by where they will appear through it.
+    /// The unzoomed camera. People are placed by where they will appear through it.
     var camera = PlazaCamera(aspect: 402.0 / 874.0)
 
     /// The person whose card is open during an arrival; they hop while they talk.
@@ -88,6 +101,7 @@ final class PlazaScene {
                     id: e.id, look: e.profile.look, wait: .random(in: 0...4, using: &rng),
                     phase: .random(in: 0...6, using: &rng), mode: e.waiting ? .waiting : .wandering)
                 if !e.waiting { (w.x, w.z) = startingSpot() }
+                w.heading = towardsViewer(from: w.x, w.z)
                 walkers.append(w)
             }
         }
@@ -98,19 +112,21 @@ final class PlazaScene {
     func beginArrival(_ ids: [UUID], instantly: Bool = false, done: @escaping () -> Void) {
         for (n, id) in ids.enumerated() {
             guard let i = walkers.firstIndex(where: { $0.id == id }) else { continue }
-            let u = min(0.8, max(0.2, 0.5 + (Double(n) - Double(ids.count - 1) / 2) * 0.2))
+            let u = min(0.8, max(0.2, 0.5 + (Double(n) - Double(ids.count - 1) / 2) * 0.24))
             let spot = camera.ground(u: u, v: Self.greetV - Double(n % 2) * 0.03) ?? (0, -30)
             walkers[i].targetX = spot.x
             walkers[i].targetZ = spot.z
             if instantly {
                 walkers[i].x = spot.x
                 walkers[i].z = spot.z
+                walkers[i].heading = towardsViewer(from: spot.x, spot.z)
                 walkers[i].mode = .arrived
-                walkers[i].moving = false
             } else {
                 walkers[i].mode = .arriving
-                walkers[i].moving = true
+                walkers[i].walked = 0
+                walkers[i].patience = hypot(spot.x - walkers[i].x, spot.z - walkers[i].z) / Self.arrivalSpeed * 2.5 + 3
             }
+            walkers[i].moving = false
         }
         arrival = (ids, done)
     }
@@ -165,44 +181,88 @@ final class PlazaScene {
         }
     }
 
+    /// The heading that faces the viewer from a spot on the floor.
+    private func towardsViewer(from x: Double, _ z: Double) -> Double {
+        atan2(camera.x - x, camera.z - z)
+    }
+
+    /// The smallest turn, left or right, that covers an angle.
+    private func shortest(_ angle: Double) -> Double {
+        var turn = angle.truncatingRemainder(dividingBy: 2 * .pi)
+        if turn > .pi { turn -= 2 * .pi }
+        if turn < -.pi { turn += 2 * .pi }
+        return turn
+    }
+
     // MARK: Frame
 
     func step(_ dt: Double) {
+        let before = walkers.map { Spot(x: $0.x, z: $0.z) }
         for i in walkers.indices {
-            // Everyone keeps facing the viewer, whichever way they are walking.
-            let facing = atan2(camera.x - walkers[i].x, camera.z - walkers[i].z)
+            // Standing still, people face the viewer.
+            var facing = towardsViewer(from: walkers[i].x, walkers[i].z)
+            var turnRate = 6.0
+            walkers[i].stepping = false
+
+            let speed: Double?
             switch walkers[i].mode {
             case .wandering:
                 if walkers[i].moving {
-                    if advance(i, speed: Self.walkSpeed, dt: dt, arriveWithin: 0.1) {
-                        walkers[i].moving = false
-                        walkers[i].wait = .random(in: 1.5...6.5, using: &rng)
-                    } else {
-                        walkers[i].phase += dt * 8.5
-                    }
+                    speed = Self.walkSpeed
                 } else {
+                    speed = nil
                     walkers[i].wait -= dt
                     if walkers[i].wait <= 0 {
                         (walkers[i].targetX, walkers[i].targetZ) = randomSpot()
                         walkers[i].moving = true
+                        walkers[i].walked = 0
+                        walkers[i].patience = hypot(walkers[i].targetX - walkers[i].x, walkers[i].targetZ - walkers[i].z) / Self.walkSpeed * 2.5 + 3
                     }
                 }
             case .arriving:
-                if advance(i, speed: Self.arrivalSpeed, dt: dt, arriveWithin: 0.15) {
-                    walkers[i].mode = .arrived
-                    walkers[i].moving = false
-                } else {
-                    walkers[i].phase += dt * 11
-                }
+                speed = Self.arrivalSpeed
             case .waiting, .arrived:
-                break
+                speed = nil
             }
-            // Turn the short way round.
-            var turn = (facing - walkers[i].heading).truncatingRemainder(dividingBy: 2 * .pi)
-            if turn > .pi { turn -= 2 * .pi }
-            if turn < -.pi { turn += 2 * .pi }
-            walkers[i].heading += turn * min(1, dt * 7)
+
+            if let speed {
+                let goal = Spot(x: walkers[i].targetX, z: walkers[i].targetZ)
+                walkers[i].walked += dt
+                let there = hypot(goal.x - before[i].x, goal.z - before[i].z) < 0.3
+                // Someone else may be standing on the goal; after a while, near enough is good enough.
+                if there || walkers[i].walked > walkers[i].patience {
+                    if walkers[i].mode == .arriving {
+                        walkers[i].mode = .arrived
+                    } else {
+                        walkers[i].moving = false
+                        walkers[i].wait = .random(in: 1.5...6.5, using: &rng)
+                    }
+                } else {
+                    var others = before
+                    others.remove(at: i)
+                    let way = Crowd.steer(from: before[i], to: goal, around: others, radius: Self.bodyRadius)
+                    facing = atan2(way.x, way.z)
+                    turnRate = 10
+                    // Turn to face the way first. No steps are taken sideways or backwards.
+                    if abs(shortest(facing - walkers[i].heading)) < 0.6 {
+                        walkers[i].x += way.x * speed * dt
+                        walkers[i].z += way.z * speed * dt
+                        walkers[i].phase += dt * (walkers[i].mode == .arriving ? 11 : 8.5)
+                        walkers[i].stepping = true
+                    }
+                }
+            }
+            walkers[i].heading += shortest(facing - walkers[i].heading) * min(1, dt * turnRate)
         }
+
+        // Nobody overlaps. People in the ring and people greeting you hold their ground; the rest give way.
+        var spots = walkers.map { Spot(x: $0.x, z: $0.z) }
+        Crowd.separate(&spots, radius: Self.bodyRadius, fixed: walkers.map { $0.mode == .waiting || $0.mode == .arrived })
+        for i in walkers.indices {
+            walkers[i].x = spots[i].x
+            walkers[i].z = spots[i].z
+        }
+
         if let arrival, !arrival.ids.contains(where: { id in walkers.contains { $0.id == id && $0.mode == .arriving } }) {
             self.arrival = nil
             // Called from the display link; let the frame finish before view state changes.
@@ -212,8 +272,12 @@ final class PlazaScene {
 
     func actors(time: Double) -> [Actor] {
         walkers.map { w in
-            var actor = Actor(id: w.id, look: w.look, x: w.x, z: w.z, heading: w.heading, walkPhase: nil, bounce: 0)
-            if w.moving {
+            // The head tips back to look at the viewer, less so the more the person is turned away.
+            let turnedAway = shortest(w.heading - towardsViewer(from: w.x, w.z))
+            var actor = Actor(
+                id: w.id, look: w.look, x: w.x, z: w.z, heading: w.heading, walkPhase: nil, bounce: 0,
+                lookUp: Float(0.3 * max(0, cos(turnedAway))))
+            if w.stepping {
                 actor.walkPhase = CGFloat(w.phase)
             } else if w.mode == .waiting {
                 actor.bounce = CGFloat(abs(sin(time * 3 + w.phase)) * 2.4)
@@ -230,17 +294,5 @@ final class PlazaScene {
         return Ring(
             x: centre.x, z: centre.z, radius: Self.ringRadius,
             visible: waiting || walkers.contains { $0.mode == .arriving }, active: waiting)
-    }
-
-    /// Moves a walker towards its target. True once it is there.
-    private func advance(_ i: Int, speed: Double, dt: Double, arriveWithin: Double) -> Bool {
-        let dx = walkers[i].targetX - walkers[i].x
-        let dz = walkers[i].targetZ - walkers[i].z
-        let distance = hypot(dx, dz)
-        if distance < arriveWithin { return true }
-        let move = min(distance, speed * dt)
-        walkers[i].x += dx / distance * move
-        walkers[i].z += dz / distance * move
-        return false
     }
 }

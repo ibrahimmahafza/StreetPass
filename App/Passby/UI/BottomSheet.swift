@@ -62,12 +62,24 @@ struct OrbButton: View {
     }
 }
 
+/// What the Passing switch in Settings is set to, and whether Bluetooth is letting it work.
+enum PassingState {
+    /// Switched off in Settings.
+    case off
+    /// Switched on and running.
+    case on
+    /// Switched on and still starting up.
+    case starting
+    /// Switched on, but Bluetooth is off, not allowed, or missing on this device.
+    case blocked
+}
+
 /// The bar along the bottom of the plaza, in the same frosted glass as the round buttons.
 /// It shows how the plaza is doing: how many people, how many passes, and whether passing is on.
 struct StatsBar: View {
     let people: Int
     let passes: Int
-    let passing: Bool
+    let passing: PassingState
 
     var body: some View {
         HStack(spacing: 0) {
@@ -75,14 +87,13 @@ struct StatsBar: View {
             divider
             stat("\(passes)", passes == 1 ? "Pass" : "Passes")
             divider
+            // The word follows the switch in Settings; the dot and the caption say whether it is really working.
             VStack(spacing: 2) {
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(passing ? Theme.green : Color(hex: 0xB9C2CA))
-                        .frame(width: 9, height: 9)
-                    Text(passing ? "On" : "Off").font(Theme.font(17, .bold)).foregroundStyle(Theme.ink)
+                    Circle().fill(dot).frame(width: 9, height: 9)
+                    Text(passing == .off ? "Off" : "On").font(Theme.font(17, .bold)).foregroundStyle(Theme.ink)
                 }
-                Text("Passing").font(Theme.font(11.5, .bold)).foregroundStyle(Theme.icon)
+                Text(caption).font(Theme.font(11.5, .bold)).foregroundStyle(Theme.icon)
             }
             .frame(maxWidth: .infinity)
         }
@@ -91,7 +102,23 @@ struct StatsBar: View {
         .frosted(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 22)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(people) people, \(passes) passes, passing \(passing ? "on" : "off")")
+        .accessibilityLabel("\(people) people, \(passes) passes, passing \(passing == .off ? "off" : "on"), \(caption)")
+    }
+
+    private var dot: Color {
+        switch passing {
+        case .off: Color(hex: 0xB9C2CA)
+        case .on: Theme.green
+        case .starting, .blocked: Color(hex: 0xF2B233)
+        }
+    }
+
+    private var caption: String {
+        switch passing {
+        case .off, .on: "Passing"
+        case .starting: "Starting"
+        case .blocked: "No Bluetooth"
+        }
     }
 
     private var divider: some View {

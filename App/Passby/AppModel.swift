@@ -130,9 +130,14 @@ final class AppModel {
         }
     }
 
-    /// True when Bluetooth passing is switched on and actually running.
-    var isPassing: Bool {
-        state.passingOn && passStatus == .on
+    /// The Passing switch in Settings, plus whether Bluetooth is letting it work.
+    var passingState: PassingState {
+        guard state.passingOn else { return .off }
+        switch passStatus {
+        case .on: return .on
+        case .starting, .off: return .starting
+        case .bluetoothOff, .denied, .unsupported: return .blocked
+        }
     }
 
     /// Why the island will not turn green outside the app, or nil when it will.

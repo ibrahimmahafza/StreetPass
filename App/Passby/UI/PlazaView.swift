@@ -72,7 +72,7 @@ struct PlazaView: View {
             StatsBar(
                 people: model.state.encounters.count,
                 passes: model.state.encounters.reduce(0) { $0 + $1.times },
-                passing: model.isPassing
+                passing: model.passingState
             )
             .padding(.top, 2)
         }

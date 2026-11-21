@@ -111,8 +111,6 @@ final class PlazaStage {
                 let node = Character3D.make(actor.look)
                 node.scale = SCNVector3(scale, scale, scale)
                 node.addChildNode(Stage.shadow(radius: 15))
-                // The camera looks down from above, so everyone tips their head back to look at it.
-                Character3D.lookUp(node, by: 0.3)
                 people.addChildNode(node)
                 figure = Figure(node: node, look: actor.look)
                 figures[actor.id] = figure
@@ -121,6 +119,7 @@ final class PlazaStage {
             node.position = SCNVector3(actor.x, 0, actor.z)
             node.eulerAngles.y = Float(actor.heading)
             Character3D.pose(node, walkPhase: actor.walkPhase, bounce: actor.bounce)
+            Character3D.lookUp(node, by: actor.lookUp)
         }
 
         ring.isHidden = !state.visible

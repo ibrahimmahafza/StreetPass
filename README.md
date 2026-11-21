@@ -14,6 +14,8 @@ app; nothing here comes from the games that inspired it.
 - A full-screen 3D checkerboard plaza where everyone you have passed walks around.
 - Three round buttons at the top: your character, people you passed, settings.
 - A bar along the bottom with your numbers: people, passes, and whether passing is on.
+- People in the plaza are solid: they walk round each other, never through, and turn to face
+  where they are going.
 - Pinch to zoom into the plaza; drag to look around while zoomed.
 - "Meet them": new people walk up one at a time with a card showing their name,
   Instagram, three artists, three games and how often you have passed.
