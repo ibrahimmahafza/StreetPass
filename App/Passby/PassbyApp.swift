@@ -16,6 +16,10 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Text("Passby")
+        if model.demo == "gallery" {
+            GalleryView()
+        } else {
+            Text("Passby")
+        }
     }
 }
