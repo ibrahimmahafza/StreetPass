@@ -21,7 +21,7 @@ struct PlazaView: View {
                 IslandGlow(active: !waiting.isEmpty, safeTop: geo.safeAreaInsets.top)
                 controls
                 if let sheet {
-                    Color(hex: 0xECF4F7).opacity(0.4)
+                    Color(hex: 0xECF4F7).opacity(0.14)
                         .ignoresSafeArea()
                         .onTapGesture { dismiss() }
                         .transition(.opacity)

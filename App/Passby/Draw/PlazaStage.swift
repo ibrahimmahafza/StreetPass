@@ -29,6 +29,12 @@ final class PlazaStage {
     init() {
         scene.background.contents = Self.floorLight
         Stage.addLights(to: scene.rootNode)
+        // The far end of the floor fades into haze. Being real fog, it sits behind the people near
+        // the front instead of washing over them.
+        scene.fogColor = UIColor.white
+        scene.fogStartDistance = 54
+        scene.fogEndDistance = 84
+        scene.fogDensityExponent = 1
 
         // Floor: one big unlit plane with a repeating two-colour tile.
         let plane = SCNPlane(width: 500, height: 500)
@@ -222,30 +228,13 @@ struct PlazaStageView: UIViewRepresentable {
     }
 }
 
-/// The plaza with its soft lighting laid over the top: a glow in the middle, cooler edges, haze at the far end.
+/// The plaza as a backdrop for a screen.
 struct PlazaBackdrop: View {
     let scene: PlazaScene
     var onTap: ((CGPoint, CGSize) -> Void)?
 
     var body: some View {
         PlazaStageView(scene: scene, onTap: onTap)
-            .overlay {
-                GeometryReader { geo in
-                    ZStack {
-                        RadialGradient(
-                            stops: [
-                                .init(color: .white.opacity(0.5), location: 0),
-                                .init(color: .white.opacity(0), location: 0.5),
-                                .init(color: Color(hex: 0x6EB9D7).opacity(0.26), location: 1),
-                            ],
-                            center: UnitPoint(x: 0.5, y: 0.58), startRadius: 60, endRadius: geo.size.height * 0.68)
-                        LinearGradient(colors: [.white.opacity(0.95), .white.opacity(0)], startPoint: .top, endPoint: .bottom)
-                            .frame(height: 170)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                    }
-                }
-                .allowsHitTesting(false)
-            }
             .accessibilityHidden(true)
     }
 }
