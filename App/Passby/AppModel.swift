@@ -26,6 +26,8 @@ final class AppModel {
 
     @ObservationIgnored let audio = Audio()
     @ObservationIgnored private let pass = PassService()
+    @ObservationIgnored private let live = LiveActivityController()
+    @ObservationIgnored private var onScreen = false
     @ObservationIgnored private let store: Store
     @ObservationIgnored private var rng = SeededGenerator(seed: 20261120)
 
@@ -56,6 +58,12 @@ final class AppModel {
         } else {
             pass.stop()
         }
+        syncIsland()
+    }
+
+    /// The green outline follows the number of people waiting.
+    private func syncIsland() {
+        live.sync(waiting: state.waiting.count, wanted: state.me != nil && state.passingOn, canStart: onScreen)
     }
 
     /// The app came to the front or left it.
@@ -67,6 +75,8 @@ final class AppModel {
             return
         }
         audio.setForeground(active)
+        onScreen = active
+        syncIsland()
     }
 
     static func live() -> AppModel {

@@ -18,6 +18,7 @@
 		62CBE7025E13B6059992B414 /* PassActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD65C5E8045F4EDF79FF36D /* PassActivityWidget.swift */; };
 		659D2262DB2DD6D87772AAEC /* CardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF1DE083A04E05B00D2516E /* CardSheet.swift */; };
 		6BA631D284C0886D5FBCF087 /* Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB33C0C8EEA7289C30693E2 /* Audio.swift */; };
+		6ECED3503D3ECD7EF0198AE0 /* LiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7484DE6AA01C697F44CA905A /* LiveActivityController.swift */; };
 		72215AE10BD8EBB02ABD276D /* PeopleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E277D15A320CF51C949395 /* PeopleSheet.swift */; };
 		8B316175669E70EDA5350EC4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 493DFDA6E1444F36289A94EE /* WidgetKit.framework */; };
 		949370D4B026C8B530DC6B78 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
@@ -77,6 +78,7 @@
 		583F0A466DDA962889DACBFA /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		5BB94B6885493A77B2E6EA8B /* theme.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = theme.wav; sourceTree = "<group>"; };
 		6DABE00C2A9CA417D78C6097 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		7484DE6AA01C697F44CA905A /* LiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityController.swift; sourceTree = "<group>"; };
 		7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassService.swift; sourceTree = "<group>"; };
 		813D2F48030F4942002B6502 /* PlazaScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaScene.swift; sourceTree = "<group>"; };
 		8A0DC52099855A0C74C2D8B7 /* PassbyLive.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PassbyLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -229,6 +231,7 @@
 			isa = PBXGroup;
 			children = (
 				0EB33C0C8EEA7289C30693E2 /* Audio.swift */,
+				7484DE6AA01C697F44CA905A /* LiveActivityController.swift */,
 				7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */,
 			);
 			path = Services;
@@ -363,6 +366,7 @@
 				BE3D984F9EADDA0ED9A24B63 /* GalleryView.swift in Sources */,
 				C8293EDF7B32733B70CFE3F1 /* IslandGlow.swift in Sources */,
 				B205108B7197F5FC7C4E782F /* LinkEntry.swift in Sources */,
+				6ECED3503D3ECD7EF0198AE0 /* LiveActivityController.swift in Sources */,
 				9F3B9E34B3A8745DF449C4BE /* LookPickers.swift in Sources */,
 				604781A3E8640A988EDDAEAF /* OnboardingView.swift in Sources */,
 				57C1F6F61B63A15A72616C6E /* Palette.swift in Sources */,
