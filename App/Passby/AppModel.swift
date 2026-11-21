@@ -17,6 +17,8 @@ final class AppModel {
     let demo: String?
     /// Onboarding step requested with `-step <0...3>`.
     let demoStep: Int
+    /// Link screen requested with `-link spotify` or `-link steam`.
+    let demoLink: String?
     /// Passes to simulate right after launch, requested with `-simulate <n>`.
     @ObservationIgnored private var pendingPasses: Int
     @ObservationIgnored private var audioCheck = false
@@ -38,6 +40,7 @@ final class AppModel {
         }
         demo = value("-demo")
         demoStep = value("-step").flatMap { Int($0) } ?? 0
+        demoLink = value("-link")
         pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }

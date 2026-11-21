@@ -35,7 +35,9 @@ struct OnboardingView: View {
         }
         .onAppear {
             step = min(3, max(0, model.demoStep))
-            if model.demo == "onboarding", step > 0 { name = "Achraf" }
+            if model.demo == "onboarding", step > 0 { name = "Demo" }
+            if model.demoLink == "spotify" { linking = .spotify }
+            if model.demoLink == "steam" { linking = .steam }
         }
     }
 

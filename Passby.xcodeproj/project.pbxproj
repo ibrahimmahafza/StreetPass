@@ -10,6 +10,7 @@
 		1F5E82ABA44348CAB8472A73 /* CharacterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18B52AED78A3B66CFEE78147 /* CharacterRenderer.swift */; };
 		24DA64FC0FAC9E4C4F00F504 /* theme.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5BB94B6885493A77B2E6EA8B /* theme.wav */; };
 		4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813D2F48030F4942002B6502 /* PlazaScene.swift */; };
+		4B1BE9CE1C34501B32ABBF54 /* SpotifyLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F1C6B23921FD86F4ECA3361 /* SpotifyLink.swift */; };
 		4C5D29241379F654B3EA2762 /* CharacterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4CEBDAB1E9F8F78F8559EB /* CharacterView.swift */; };
 		54D8F3EA383B8E1B59F5E724 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
 		57C1F6F61B63A15A72616C6E /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5E6C67ED9841916C98FCFFE /* Palette.swift */; };
@@ -20,9 +21,11 @@
 		6BA631D284C0886D5FBCF087 /* Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EB33C0C8EEA7289C30693E2 /* Audio.swift */; };
 		6ECED3503D3ECD7EF0198AE0 /* LiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7484DE6AA01C697F44CA905A /* LiveActivityController.swift */; };
 		72215AE10BD8EBB02ABD276D /* PeopleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E277D15A320CF51C949395 /* PeopleSheet.swift */; };
+		7F34DF3F5190E28C48E9CBAA /* SteamLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E3C196E8553DF5E8D6112FA /* SteamLink.swift */; };
 		8B316175669E70EDA5350EC4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 493DFDA6E1444F36289A94EE /* WidgetKit.framework */; };
 		949370D4B026C8B530DC6B78 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
 		9AD25B706D62B53F7C629B1B /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDC46C899DBE15C46567A41F /* AppModel.swift */; };
+		9EA5CAF99EA8DBB2F928EB04 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E9869905F705A49DA04115E /* Secrets.swift */; };
 		9F3B9E34B3A8745DF449C4BE /* LookPickers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFD42094A26D7D728CFC2752 /* LookPickers.swift */; };
 		A145314F680D91D0272B7514 /* PlazaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F67C35170628CEB552A9B062 /* PlazaView.swift */; };
 		A640B81F34A33BA4D38E00E2 /* CharacterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 270CA92852530053CFE22FA9 /* CharacterSheet.swift */; };
@@ -65,6 +68,7 @@
 
 /* Begin PBXFileReference section */
 		0511C74924768DB811901E0B /* PassbyCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PassbyCore; path = PassbyCore; sourceTree = SOURCE_ROOT; };
+		0E3C196E8553DF5E8D6112FA /* SteamLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamLink.swift; sourceTree = "<group>"; };
 		0EB33C0C8EEA7289C30693E2 /* Audio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Audio.swift; sourceTree = "<group>"; };
 		18B52AED78A3B66CFEE78147 /* CharacterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterRenderer.swift; sourceTree = "<group>"; };
 		270CA92852530053CFE22FA9 /* CharacterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterSheet.swift; sourceTree = "<group>"; };
@@ -79,7 +83,9 @@
 		5BB94B6885493A77B2E6EA8B /* theme.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = theme.wav; sourceTree = "<group>"; };
 		6DABE00C2A9CA417D78C6097 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7484DE6AA01C697F44CA905A /* LiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityController.swift; sourceTree = "<group>"; };
+		7E9869905F705A49DA04115E /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassService.swift; sourceTree = "<group>"; };
+		7F1C6B23921FD86F4ECA3361 /* SpotifyLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyLink.swift; sourceTree = "<group>"; };
 		813D2F48030F4942002B6502 /* PlazaScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaScene.swift; sourceTree = "<group>"; };
 		8A0DC52099855A0C74C2D8B7 /* PassbyLive.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PassbyLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		94E277D15A320CF51C949395 /* PeopleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleSheet.swift; sourceTree = "<group>"; };
@@ -233,6 +239,9 @@
 				0EB33C0C8EEA7289C30693E2 /* Audio.swift */,
 				7484DE6AA01C697F44CA905A /* LiveActivityController.swift */,
 				7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */,
+				7E9869905F705A49DA04115E /* Secrets.swift */,
+				7F1C6B23921FD86F4ECA3361 /* SpotifyLink.swift */,
+				0E3C196E8553DF5E8D6112FA /* SteamLink.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -376,7 +385,10 @@
 				72215AE10BD8EBB02ABD276D /* PeopleSheet.swift in Sources */,
 				4AB4D187914D4D8E80CF1361 /* PlazaScene.swift in Sources */,
 				A145314F680D91D0272B7514 /* PlazaView.swift in Sources */,
+				9EA5CAF99EA8DBB2F928EB04 /* Secrets.swift in Sources */,
 				AA7A0AFCD67FFFF73C232978 /* SettingsSheet.swift in Sources */,
+				4B1BE9CE1C34501B32ABBF54 /* SpotifyLink.swift in Sources */,
+				7F34DF3F5190E28C48E9CBAA /* SteamLink.swift in Sources */,
 				F353A8F8C5BFA9A9C2AE143B /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
