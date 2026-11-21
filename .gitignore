@@ -6,3 +6,5 @@ xcuserdata/
 .superpowers/
 Secrets.plist
 .build/
+Passby.xcodeproj/xcuserdata/
+Passby.xcodeproj/project.xcworkspace/xcuserdata/
