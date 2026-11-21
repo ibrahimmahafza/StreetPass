@@ -119,7 +119,10 @@ Achraf handed the how to Claude; approach 1 is Claude's pick.
 - **Passing counts by last sighting.** Someone counts as passed again after ten minutes
   out of range, so phones left together stay one pass. Settings has "Forget everyone".
 - **Bluetooth retries within about five seconds** after a failed attempt.
-- **Menu bar at the bottom, and zoom.** Achraf later asked for "a menu ui bar at the bottom" and
-  "a feature to be able to zoom", which replaces the round buttons at the top. Pinch zooms up to
-  three times around the fingers; a drag slides the view while zoomed. People are always placed
-  through the unzoomed camera, so zooming never moves them.
+- **Zoom, and a bar at the bottom.** Achraf asked for "a feature to be able to zoom" and a bar
+  at the bottom. The menu was briefly moved into that bar; he then asked for the round buttons
+  back at the top with the bar kept "just to not make the app look too empty". The bar now
+  shows numbers (people, passes, whether passing is on) in the same frosted style, which is
+  Claude's call for what it should hold. Pinch zooms up to three times around the fingers; a
+  drag slides the view while zoomed. People are always placed through the unzoomed camera, so
+  zooming never moves them.

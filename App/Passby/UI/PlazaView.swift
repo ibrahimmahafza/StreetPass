@@ -1,7 +1,8 @@
 import PassbyCore
 import SwiftUI
 
-/// The main screen: the plaza fills it, with the menu bar along the bottom. Pinch to zoom.
+/// The main screen: the plaza fills it, three round buttons float at the top and a bar of
+/// numbers sits along the bottom. Pinch to zoom.
 struct PlazaView: View {
     @Environment(AppModel.self) private var model
     @State private var scene = PlazaScene()
@@ -26,7 +27,7 @@ struct PlazaView: View {
                         .onTapGesture { dismiss() }
                         .transition(.opacity)
                     panel(sheet)
-                        .frame(maxHeight: geo.size.height - 24, alignment: .bottom)
+                        .frame(maxHeight: geo.size.height - 76, alignment: .bottom)
                         .frame(maxHeight: .infinity, alignment: .bottom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -50,6 +51,12 @@ struct PlazaView: View {
 
     private var controls: some View {
         VStack(spacing: 10) {
+            HStack(spacing: 14) {
+                OrbButton(symbol: "person", label: "Your character") { open(.me) }
+                OrbButton(symbol: "person.2", label: "People you passed") { open(.people) }
+                OrbButton(symbol: "slider.horizontal.3", label: "Settings") { open(.settings) }
+            }
+            .padding(.top, 8)
             Spacer()
             if !arriving {
                 if !waiting.isEmpty {
@@ -62,11 +69,11 @@ struct PlazaView: View {
                         .padding(.horizontal, 24)
                 }
             }
-            MenuBar(items: [
-                .init(symbol: "person", title: "You") { open(.me) },
-                .init(symbol: "person.2", title: "People") { open(.people) },
-                .init(symbol: "slider.horizontal.3", title: "Settings") { open(.settings) },
-            ])
+            StatsBar(
+                people: model.state.encounters.count,
+                passes: model.state.encounters.reduce(0) { $0 + $1.times },
+                passing: model.isPassing
+            )
             .padding(.top, 2)
         }
         .padding(.bottom, 4)

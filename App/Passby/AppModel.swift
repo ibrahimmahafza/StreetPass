@@ -130,6 +130,11 @@ final class AppModel {
         }
     }
 
+    /// True when Bluetooth passing is switched on and actually running.
+    var isPassing: Bool {
+        state.passingOn && passStatus == .on
+    }
+
     /// Why the island will not turn green outside the app, or nil when it will.
     var islandNote: String? {
         live.allowed ? nil : "Live Activities are off for Passby in iOS Settings, so the island only turns green inside the app."

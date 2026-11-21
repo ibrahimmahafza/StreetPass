@@ -43,39 +43,78 @@ struct BottomSheet<Content: View>: View {
     }
 }
 
-/// The menu along the bottom of the plaza: a frosted bar of icons with a word under each.
-struct MenuBar: View {
-    struct Item: Identifiable {
-        let symbol: String
-        let title: String
-        let action: () -> Void
-        var id: String { title }
-    }
+/// A round frosted button that floats over the plaza.
+struct OrbButton: View {
+    let symbol: String
+    let label: String
+    let action: () -> Void
 
-    let items: [Item]
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Theme.icon)
+                .frame(width: 58, height: 58)
+                .frosted(in: Circle())
+        }
+        .buttonStyle(PressScaleStyle())
+        .accessibilityLabel(label)
+    }
+}
+
+/// The bar along the bottom of the plaza, in the same frosted glass as the round buttons.
+/// It shows how the plaza is doing: how many people, how many passes, and whether passing is on.
+struct StatsBar: View {
+    let people: Int
+    let passes: Int
+    let passing: Bool
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(items) { item in
-                Button(action: item.action) {
-                    VStack(spacing: 3) {
-                        Image(systemName: item.symbol).font(.system(size: 20, weight: .semibold))
-                        Text(item.title).font(Theme.font(11.5, .bold))
-                    }
-                    .foregroundStyle(Theme.icon)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .contentShape(Rectangle())
+            stat("\(people)", people == 1 ? "Person" : "People")
+            divider
+            stat("\(passes)", passes == 1 ? "Pass" : "Passes")
+            divider
+            VStack(spacing: 2) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(passing ? Theme.green : Color(hex: 0xB9C2CA))
+                        .frame(width: 9, height: 9)
+                    Text(passing ? "On" : "Off").font(Theme.font(17, .bold)).foregroundStyle(Theme.ink)
                 }
-                .buttonStyle(PressScaleStyle())
+                Text("Passing").font(Theme.font(11.5, .bold)).foregroundStyle(Theme.icon)
             }
+            .frame(maxWidth: .infinity)
         }
+        .frame(height: 58)
         .padding(.horizontal, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Color.white.opacity(0.95), lineWidth: 2))
-        .shadow(color: Color(hex: 0x466E82).opacity(0.22), radius: 6, y: 3)
+        .frosted(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 22)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(people) people, \(passes) passes, passing \(passing ? "on" : "off")")
+    }
+
+    private var divider: some View {
+        Rectangle().fill(Theme.icon.opacity(0.18)).frame(width: 1, height: 26)
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value).font(Theme.font(17, .bold)).foregroundStyle(Theme.ink)
+            Text(label).font(Theme.font(11.5, .bold)).foregroundStyle(Theme.icon)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+extension View {
+    /// The frosted-glass look shared by everything that floats over the plaza.
+    func frosted<S: Shape>(in shape: S) -> some View {
+        self
+            .background(.ultraThinMaterial, in: shape)
+            .background(Color.white.opacity(0.45), in: shape)
+            .overlay(shape.stroke(Color.white.opacity(0.95), lineWidth: 2))
+            .shadow(color: Color(hex: 0x466E82).opacity(0.22), radius: 5, y: 3)
     }
 }
 
