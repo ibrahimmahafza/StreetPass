@@ -9,10 +9,8 @@ import UIKit
 enum Character3D {
     /// Node names used by `pose`.
     private enum Part {
-        static let body = "body", legLeft = "legL", legRight = "legR", armLeft = "armL", armRight = "armR"
+        static let body = "body", shape = "shape", legLeft = "legL", legRight = "legR"
     }
-
-    private static let armSpread: Float = 0.36
 
     static func make(_ rawLook: Look) -> SCNNode {
         let look = rawLook.clamped()
@@ -26,37 +24,26 @@ enum Character3D {
         body.name = Part.body
         root.addChildNode(body)
 
-        // Legs and trainers. Each leg hangs from a pivot at the hip so it can swing.
+        // The body is one continuous surface: hoodie, arms, hands and legs with no joins.
+        let shape = BodyShape(material: BodyMesh.material(top: top, legs: pants, skin: skin))
+        shape.name = Part.shape
+        body.addChildNode(shape)
+
+        // Trainers hang from pivots at the hips, so they swing with the legs of the surface above them.
+        let hipX = CGFloat(BodyMesh.hipX), hipY = CGFloat(BodyMesh.hipY)
         for s: CGFloat in [-1, 1] {
             let leg = SCNNode()
             leg.name = s < 0 ? Part.legLeft : Part.legRight
-            leg.position = SCNVector3(s * 5.9, 40, 0)
+            leg.position = SCNVector3(s * hipX, hipY, 0)
             body.addChildNode(leg)
-            put(SCNCapsule(capRadius: 4, height: 32), pants, 0, -16, 0, in: leg)
-            put(box(9.4, 6.4, 17, 3), RGB(0xF4F6F9), 0, -35.8, 2.8, in: leg)
-            put(box(9.8, 2, 17.4, 1), RGB(0xAEBAC8), 0, -39, 2.8, in: leg)
-            put(box(4.4, 1.8, 5.4, 0.8), top, 0, -32.4, 6, in: leg)
+            put(box(9.4, 6.4, 17, 3), RGB(0xF4F6F9), 0, 3.6 - hipY, 2.8, in: leg)
+            put(box(9.8, 2, 17.4, 1), RGB(0xAEBAC8), 0, 1 - hipY, 2.8, in: leg)
+            put(box(4.4, 1.8, 5.4, 0.8), top, 0, 7 - hipY, 6, in: leg)
         }
 
-        // Hoodie: body, shoulders that slope down into the arms, hem, pocket, drawstrings, and the hood behind the neck.
-        put(SCNCapsule(capRadius: 11.4, height: 33), top, 0, 54.5, 0, in: body).scale = SCNVector3(1, 1, 0.74)
-        put(SCNSphere(radius: 1), top, 0, 64, 0, in: body).scale = SCNVector3(15.2, 5.8, 8.4)
-        put(SCNTorus(ringRadius: 10.4, pipeRadius: 1.7), top.mix(-0.1), 0, 40.8, 0, in: body).scale = SCNVector3(1, 1, 0.74)
-        put(box(12.5, 6.2, 2.4, 1.2), top.mix(-0.09), 0, 46.5, 7.5, in: body)
+        // Drawstrings and nothing else on the hoodie, to keep the shape clean.
         for s: CGFloat in [-1, 1] {
-            put(SCNCapsule(capRadius: 0.55, height: 8), RGB(0xFFFFFF), s * 3, 61, 8, in: body)
-        }
-        put(SCNSphere(radius: 1), top.mix(-0.06), 0, 66.5, -6.4, in: body).scale = SCNVector3(10.5, 5.6, 7)
-
-        // Arms with mitten hands, from pivots at the shoulders.
-        for s: CGFloat in [-1, 1] {
-            let arm = SCNNode()
-            arm.name = s < 0 ? Part.armLeft : Part.armRight
-            arm.position = SCNVector3(s * 12.6, 63.2, 0)
-            arm.eulerAngles.z = Float(s) * armSpread
-            body.addChildNode(arm)
-            put(SCNCapsule(capRadius: 3.6, height: 27), top, 0, -12.5, 0, in: arm)
-            put(SCNSphere(radius: 4.8), skin, 0, -26, 0, in: arm)
+            put(SCNCapsule(capRadius: 0.55, height: 7), RGB(0xFFFFFF), s * 2.8, 58.4, 7.7, in: body)
         }
 
         // Head: the egg, ears, and the sketched face laid over its front.
@@ -79,15 +66,16 @@ enum Character3D {
         return root
     }
 
-    /// Swings the limbs for a walk, or lifts the body for an idle bounce.
+    /// Steps the body through its walk, or lifts it for an idle bounce.
     static func pose(_ node: SCNNode, walkPhase: CGFloat?, bounce: CGFloat) {
-        let swing = Float(walkPhase.map { sin($0) } ?? 0)
+        let frame = walkPhase.map { BodyMesh.frame(for: $0) } ?? 0
+        let swing = BodyMesh.swing(frame)
         let lift = walkPhase.map { abs(cos($0)) * 1.4 } ?? bounce
-        node.childNode(withName: Part.body, recursively: false)?.position.y = Float(lift)
-        node.childNode(withName: Part.legLeft, recursively: true)?.eulerAngles.x = swing * 0.6
-        node.childNode(withName: Part.legRight, recursively: true)?.eulerAngles.x = -swing * 0.6
-        node.childNode(withName: Part.armLeft, recursively: true)?.eulerAngles = SCNVector3(-swing * 0.6, 0, -armSpread)
-        node.childNode(withName: Part.armRight, recursively: true)?.eulerAngles = SCNVector3(swing * 0.6, 0, armSpread)
+        guard let body = node.childNode(withName: Part.body, recursively: false) else { return }
+        body.position.y = Float(lift)
+        (body.childNode(withName: Part.shape, recursively: false) as? BodyShape)?.show(frame)
+        body.childNode(withName: Part.legLeft, recursively: false)?.eulerAngles.x = swing * BodyMesh.legSwing
+        body.childNode(withName: Part.legRight, recursively: false)?.eulerAngles.x = -swing * BodyMesh.legSwing
     }
 
     // MARK: Head

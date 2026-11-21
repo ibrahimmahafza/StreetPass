@@ -88,8 +88,8 @@ docs/           the design, the plan and the approved mockup
 ```
 
 The characters are 3D models built in code: a smooth egg-shaped head with a pencil-sketched
-face on a slim body. To change how every one of them looks, edit
-`App/Passby/Draw/Character3D.swift`.
+face, on a body that is one continuous surface. The head, hair and face are in
+`App/Passby/Draw/Character3D.swift`; the body's shape is in `App/Passby/Draw/BodyMesh.swift`.
 To change the tune, edit `tools/make_music.py` and run it.
 
 Tests: `swift test --package-path PassbyCore`
