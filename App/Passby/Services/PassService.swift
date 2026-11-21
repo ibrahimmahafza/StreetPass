@@ -1,4 +1,4 @@
-import CoreBluetooth
+@preconcurrency import CoreBluetooth
 import PassbyCore
 
 /// Notices other phones running Passby and swaps profiles with them over Bluetooth.
@@ -11,8 +11,8 @@ final class PassService: NSObject {
         case off, starting, on, bluetoothOff, denied, unsupported
     }
 
-    static let serviceID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0001")
-    static let profileID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0002")
+    nonisolated(unsafe) static let serviceID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0001")
+    nonisolated(unsafe) static let profileID = CBUUID(string: "7E5B0F4A-3C1D-4E2A-9B6F-50A55B1E0002")
 
     private(set) var status = Status.off {
         didSet { if status != oldValue { onStatus?(status) } }

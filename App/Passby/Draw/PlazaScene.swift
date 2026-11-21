@@ -67,7 +67,9 @@ final class PlazaScene {
     var talking: UUID?
 
     private var walkers: [Walker] = []
-    private var rng = SeededGenerator(seed: 4)
+    private var rng = SystemRandomNumberGenerator()
+    /// How many people have been given a starting spot, so each new one fills a gap.
+    private var placed = 0
     private var arrival: (ids: [UUID], done: () -> Void)?
     private var lastTime: TimeInterval?
     private var projection: Projection?
@@ -92,7 +94,7 @@ final class PlazaScene {
                 var w = Walker(
                     id: e.id, look: e.profile.look, wait: .random(in: 0...4, using: &rng),
                     phase: .random(in: 0...6, using: &rng), mode: e.waiting ? .waiting : .wandering)
-                if !e.waiting { (w.x, w.z) = randomSpot() }
+                if !e.waiting { (w.x, w.z) = startingSpot() }
                 walkers.append(w)
             }
         }
@@ -131,11 +133,25 @@ final class PlazaScene {
     }
 
     private func randomSpot() -> (CGFloat, CGFloat) {
+        spot(.random(in: 0...1, using: &rng), .random(in: 0...1, using: &rng))
+    }
+
+    /// Where a newcomer to the crowd first stands. Successive people land in the gaps left by
+    /// earlier ones, so the plaza looks evenly filled however many there are.
+    private func startingSpot() -> (CGFloat, CGFloat) {
+        let n = CGFloat(placed)
+        placed += 1
+        return spot((0.37 + n * 0.754_877_666).truncatingRemainder(dividingBy: 1), (0.11 + n * 0.569_840_291).truncatingRemainder(dividingBy: 1))
+    }
+
+    /// A spot on the floor from two fractions: `across` the width and `up` the screen.
+    private func spot(_ across: CGFloat, _ up: CGFloat) -> (CGFloat, CGFloat) {
         // Even spacing on screen, not in depth: far rows are squeezed together by the perspective.
         let d = projection?.depthOffset ?? 32
-        let z = 1 / CGFloat.random(in: 1 / (Self.farDepth + d)...1 / (Self.nearDepth + d), using: &rng) - d
+        let near = 1 / (Self.nearDepth + d), far = 1 / (Self.farDepth + d)
+        let z = 1 / (near + (far - near) * up) - d
         let reach = 3.3 + 0.12 * z
-        return (.random(in: -reach...reach, using: &rng), z)
+        return ((across * 2 - 1) * reach, z)
     }
 
     private func layoutRing() {

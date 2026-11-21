@@ -186,7 +186,7 @@ final class AppModel {
                 s.encounters[j].times = Int.random(in: 1...6, using: &rng)
             }
         }
-        if demo != "plaza" && demo != "gallery" {
+        if demo != "plaza" && demo != "gallery" && demo != "icon" {
             var lina = demoProfile(named: "Lina")
             lina.look = Look(skin: 2, hair: 3, hairColor: 1, eyes: 0, mouth: 0, hoodie: 7, extra: 0)
             lina.instagram = "lina.mtl"

@@ -23,6 +23,8 @@ struct RootView: View {
     var body: some View {
         if model.demo == "gallery" {
             GalleryView()
+        } else if model.demo == "icon" {
+            IconView()
         } else if model.state.me == nil {
             OnboardingView()
         } else {

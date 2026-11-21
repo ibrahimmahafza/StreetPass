@@ -32,6 +32,7 @@
 		AA7A0AFCD67FFFF73C232978 /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F7F5E1C0DBFC3EC969DB3D /* SettingsSheet.swift */; };
 		B1643E14D012428B3E45243F /* PassbyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0B931FBA4E55E2845E1BDA5 /* PassbyApp.swift */; };
 		B205108B7197F5FC7C4E782F /* LinkEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AB075E4FE836217E48BF834 /* LinkEntry.swift */; };
+		B3C997EC905A4633C6EA6F3B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7E7BD6F807436FE514F4B549 /* Assets.xcassets */; };
 		BA76BC1A8A10CA9831F2C70D /* PassService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */; };
 		BE3D984F9EADDA0ED9A24B63 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4B50B1BDB63F8C14B0E3E6A /* GalleryView.swift */; };
 		BEE73B03B4BD6E1BB5CBBB3E /* PassbyLiveBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A924A77B769F9C6CE0DFB0F5 /* PassbyLiveBundle.swift */; };
@@ -83,6 +84,7 @@
 		5BB94B6885493A77B2E6EA8B /* theme.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = theme.wav; sourceTree = "<group>"; };
 		6DABE00C2A9CA417D78C6097 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7484DE6AA01C697F44CA905A /* LiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityController.swift; sourceTree = "<group>"; };
+		7E7BD6F807436FE514F4B549 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7E9869905F705A49DA04115E /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		7EF3ED4B7BFFE05A8EE4ACB5 /* PassService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassService.swift; sourceTree = "<group>"; };
 		7F1C6B23921FD86F4ECA3361 /* SpotifyLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyLink.swift; sourceTree = "<group>"; };
@@ -149,6 +151,7 @@
 			isa = PBXGroup;
 			children = (
 				BDC46C899DBE15C46567A41F /* AppModel.swift */,
+				7E7BD6F807436FE514F4B549 /* Assets.xcassets */,
 				4D3CFF7BD6B004C0E18222F3 /* Info.plist */,
 				E0B931FBA4E55E2845E1BDA5 /* PassbyApp.swift */,
 				7EC903A09B39D24C7BA0116B /* Draw */,
@@ -344,6 +347,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B3C997EC905A4633C6EA6F3B /* Assets.xcassets in Resources */,
 				24DA64FC0FAC9E4C4F00F504 /* theme.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

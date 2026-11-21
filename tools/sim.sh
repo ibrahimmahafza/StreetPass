@@ -25,8 +25,10 @@ xcrun simctl boot "$SIM" 2>/dev/null || true
 xcrun simctl bootstatus "$SIM" -b > /dev/null
 xcrun simctl terminate "$SIM" com.passbyplaza.app 2>/dev/null || true
 xcrun simctl install "$SIM" "$DD/Build/Products/Debug-iphonesimulator/Passby.app"
+# A copy that is still running would be brought forward without the new arguments, so make sure it is gone.
+sleep 1
 # shellcheck disable=SC2086
-xcrun simctl launch "$SIM" com.passbyplaza.app ${ARGS--reset -mute -demo "$DEMO"} > /dev/null
+xcrun simctl launch --terminate-running-process "$SIM" com.passbyplaza.app ${ARGS--reset -mute -demo "$DEMO"} > /dev/null
 sleep "${WAIT:-3}"
 xcrun simctl io "$SIM" screenshot "$OUT" > /dev/null 2>&1
 sips -Z "${SHOT_MAX:-1300}" "$OUT" > /dev/null 2>&1 || true
