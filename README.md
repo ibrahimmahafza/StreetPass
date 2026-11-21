@@ -52,6 +52,14 @@ The first run registers the bundle IDs `com.passbyplaza.app` and
 `com.passbyplaza.app.live` with the developer team set in `project.yml`
 (`DEVELOPMENT_TEAM`). Change the team or the IDs there if you need to.
 
+## When a test on a real phone goes wrong
+
+The app keeps a running record of what Bluetooth, ranging and the island did.
+
+- On the phone: Settings, Diagnostics. "Share" sends the text anywhere.
+- Over the cable: `tools/logs.sh` copies the record off the phone and prints the end of it.
+- Live: `tools/watch.sh` launches the app on the phone and prints each line as it happens.
+
 ## Demo script
 
 1. Two phones with the app installed, both through onboarding, Bluetooth on.
