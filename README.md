@@ -131,6 +131,13 @@ copy `App/Secrets.example.plist` to `App/Passby/Resources/Secrets.plist` and fil
 - `SteamAPIKey`: from steamcommunity.com/dev/apikey. The person's Steam profile and
   game details must be public.
 
+"Log in with Steam" opens Steam's own sign-in page in a sheet. Steam's sign-in only says
+who someone is, so their games are still read with the key above, and still only if their
+game details are public; the app says how to change that when they are not. The login is
+kept in the Keychain and the three most-played games are read again each time the app is
+opened, until the person logs out in Settings. Looking a profile up by its link or name
+still works without logging in.
+
 A Spotify login gives the top ten artists of roughly the last six months, each with the
 cover of the album the person's most played song by that artist is on (or the artist's
 photo when there is no such song). The login is kept in the Keychain, so the list is

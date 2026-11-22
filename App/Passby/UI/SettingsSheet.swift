@@ -37,7 +37,7 @@ struct SettingsSheet: View {
                     toggle("Music", nil, $model.state.musicOn)
                     toggle("Sounds", nil, $model.state.soundsOn)
                     link("Spotify", (model.spotifyLoggedIn ? "Logged in · " : "") + (model.state.me?.artists ?? []).joined(separator: ", "), .spotify)
-                    link("Steam", (model.state.me?.games ?? []).joined(separator: ", "), .steam)
+                    link("Steam", (model.steamLoggedIn ? "Logged in · " : "") + (model.state.me?.games ?? []).joined(separator: ", "), .steam)
                     HStack(spacing: 6) {
                         Text("Instagram").font(Theme.font(15.5, .bold))
                         Spacer(minLength: 8)

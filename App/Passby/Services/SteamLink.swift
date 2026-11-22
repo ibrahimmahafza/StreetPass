@@ -1,10 +1,69 @@
 import Foundation
 import PassbyCore
+import WebKit
 
-/// Reads someone's three most-played games, and the one they played most recently, from their public Steam profile.
+/// Reads someone's three most-played games, and the one they played most recently, from their
+/// public Steam profile. Who they are comes from signing in through Steam, which the app then
+/// keeps so the games can be read again, or from a profile link or name typed in.
 @MainActor
 enum SteamLink {
-    enum Failure: Error { case notConfigured, notAProfile, notFound, isPrivate, noAnswer }
+    enum Failure: Error {
+        case notConfigured, notAProfile, notFound, isPrivate, noAnswer
+        /// Steam did not confirm the sign-in as its own.
+        case notConfirmed
+        /// Nobody is logged in.
+        case loggedOut
+    }
+
+    // MARK: Staying logged in
+
+    /// The Keychain entry that holds the Steam ID of whoever is logged in.
+    private static let idName = "steam-id"
+
+    static var isLoggedIn: Bool { Keychain.read(idName) != nil }
+
+    /// Forgets who was logged in, here and on Steam's sign-in page, so the next login asks again.
+    static func logOut() {
+        Keychain.delete(idName)
+        let store = WKWebsiteDataStore.default()
+        store.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
+            let steam = records.filter { $0.displayName.contains("steam") }
+            store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: steam) {}
+        }
+    }
+
+    #if DEBUG
+    /// For trying the logged-in screens without a login. Debug builds only.
+    static func pretendLogin(_ id: String) {
+        Keychain.write(id, for: idName)
+    }
+    #endif
+
+    /// Finishes a sign-in: has Steam confirm it, reads the person's games, and only then keeps the
+    /// login, so one whose games cannot be read is not kept and retried on every open.
+    static func logIn(_ claim: SteamLogin.Claim) async throws -> Found {
+        var request = URLRequest(url: SteamLogin.confirmation)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = SteamLogin.form(claim.check)
+        guard let (body, response) = try? await URLSession.shared.data(for: request) else { throw Failure.noAnswer }
+        guard SteamLogin.isConfirmed(status: (response as? HTTPURLResponse)?.statusCode ?? 0, body: body) else {
+            note("links", "Steam did not confirm the login")
+            throw Failure.notConfirmed
+        }
+        let found = try await games(steamID: claim.steamID)
+        Keychain.write(claim.steamID, for: idName)
+        note("links", "logged in to Steam")
+        return found
+    }
+
+    /// The games of whoever is logged in, read again.
+    static func refresh() async throws -> Found {
+        guard let id = Keychain.read(idName) else { throw Failure.loggedOut }
+        return try await games(steamID: id)
+    }
+
+    // MARK: Games
 
     /// What a profile gave: the three most-played names, and the card for the game played most recently.
     struct Found {
@@ -14,12 +73,11 @@ enum SteamLink {
 
     static func games(profile: String) async throws -> Found {
         guard let key = Secrets.steamAPIKey else { throw Failure.notConfigured }
-        let steamID: String
         switch SteamInput.parse(profile) {
         case .invalid:
             throw Failure.notAProfile
         case let .id(id):
-            steamID = id
+            return try await games(steamID: id)
         case let .vanity(name):
             struct Resolved: Decodable {
                 struct Body: Decodable { let steamid: String? }
@@ -27,9 +85,13 @@ enum SteamLink {
             }
             let resolved: Resolved = try await get("ISteamUser/ResolveVanityURL/v1", ["key": key, "vanityurl": name])
             guard let id = resolved.response.steamid else { throw Failure.notFound }
-            steamID = id
+            return try await games(steamID: id)
         }
+    }
 
+    /// The same for a Steam ID that is already known.
+    static func games(steamID: String) async throws -> Found {
+        guard let key = Secrets.steamAPIKey else { throw Failure.notConfigured }
         struct Games: Decodable {
             struct Game: Decodable {
                 let appid: Int?

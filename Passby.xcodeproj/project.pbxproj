@@ -29,6 +29,7 @@
 		77BF206A104FB0D00B18C809 /* LookStudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94330CC676469EBE3D738D9E /* LookStudio.swift */; };
 		7B5D0213C1C0FA69645A946E /* BodyMesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D7000B9A752A9449F9C09B6 /* BodyMesh.swift */; };
 		7F34DF3F5190E28C48E9CBAA /* SteamLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E3C196E8553DF5E8D6112FA /* SteamLink.swift */; };
+		86497078EB0016126A7BF51B /* SteamSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5764094FA6DC997E898B4F9 /* SteamSignIn.swift */; };
 		8B316175669E70EDA5350EC4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 493DFDA6E1444F36289A94EE /* WidgetKit.framework */; };
 		949370D4B026C8B530DC6B78 /* PassActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52EB1C4EB64A49153EC2282B /* PassActivityAttributes.swift */; };
 		9AD25B706D62B53F7C629B1B /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDC46C899DBE15C46567A41F /* AppModel.swift */; };
@@ -126,6 +127,7 @@
 		E0B931FBA4E55E2845E1BDA5 /* PassbyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PassbyApp.swift; sourceTree = "<group>"; };
 		ED812E7FF4D7AE4B6A252A98 /* BottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomSheet.swift; sourceTree = "<group>"; };
 		F4B50B1BDB63F8C14B0E3E6A /* GalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryView.swift; sourceTree = "<group>"; };
+		F5764094FA6DC997E898B4F9 /* SteamSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamSignIn.swift; sourceTree = "<group>"; };
 		F67C35170628CEB552A9B062 /* PlazaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlazaView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -167,6 +169,7 @@
 				94E277D15A320CF51C949395 /* PeopleSheet.swift */,
 				F67C35170628CEB552A9B062 /* PlazaView.swift */,
 				D4F7F5E1C0DBFC3EC969DB3D /* SettingsSheet.swift */,
+				F5764094FA6DC997E898B4F9 /* SteamSignIn.swift */,
 				AAC5C3E19217C60D99C35A40 /* Theme.swift */,
 			);
 			path = UI;
@@ -439,6 +442,7 @@
 				AA7A0AFCD67FFFF73C232978 /* SettingsSheet.swift in Sources */,
 				4B1BE9CE1C34501B32ABBF54 /* SpotifyLink.swift in Sources */,
 				7F34DF3F5190E28C48E9CBAA /* SteamLink.swift in Sources */,
+				86497078EB0016126A7BF51B /* SteamSignIn.swift in Sources */,
 				F353A8F8C5BFA9A9C2AE143B /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -521,7 +525,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 62GLRR66AN;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -612,7 +616,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 62GLRR66AN;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

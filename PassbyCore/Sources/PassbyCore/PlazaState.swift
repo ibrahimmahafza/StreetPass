@@ -61,6 +61,20 @@ public struct PlazaState: Codable, Equatable, Sendable {
         remember(artists)
     }
 
+    /// Steam sent a fresh list of your games. It replaces yours, the game you played last becomes
+    /// your game card, and it goes in your hands if you were holding the old one. Whatever else
+    /// you chose to hold, or nothing, is left alone. Without a game to hold up, the first is the card.
+    public mutating func setTopGames(_ names: [String], card: Holding?) {
+        guard var mine = me, let first = names.first else { return }
+        let card = (card ?? Holding(kind: .game, title: first, picture: nil)).normalized()
+        mine.games = Array(names.prefix(Profile.gameCount))
+        if mine.holding == gameCard, gameCard != nil { mine.holding = card }
+        me = mine.normalized()
+        gameCard = card
+        steamLinked = true
+        remember(card)
+    }
+
     /// Keeps the picture that came with each artist, so it can be shown when someone shares them.
     /// Works before there is a profile, for someone who logs in to Spotify while still setting up.
     public mutating func remember(_ artists: [SpotifyReply.Artist]) {

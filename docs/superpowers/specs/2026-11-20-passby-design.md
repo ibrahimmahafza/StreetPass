@@ -445,3 +445,33 @@ pulse was an animation of its own, and that animation was also being applied to 
 shape. The black shape and the edge are now one view (`IslandBody`), drawn from the same
 outline on every frame, with the pulse worked out from the clock rather than animated. After
 the change the edge sits 8 to 10 pixels outside the black shape on every frame of the opening.
+
+## Log in with Steam (2026-11-22, build 14)
+
+Achraf: "please do a proper steam log in like for spotify".
+
+- "Log in with Steam" on the Steam link screen opens Steam's own sign-in page in a sheet
+  (`SteamSignIn`). Steam's sign-in is the old OpenID kind made for websites: it ends by sending
+  the browser to an address of the site's with a signed statement of who signed in. Whether
+  Steam would hand back to an app address like `passby://` could not be found out from outside
+  (its page checks nothing until someone has signed in), so the app shows the page in its own
+  web view, gives Steam an ordinary web address to come back to (`https://passby/steam`, where
+  nothing lives), and catches that last move instead of opening it. The bar over the page
+  always shows which site is on screen. The app only ever reads that final address.
+- The statement is sent back to Steam to confirm it is genuine before it is believed
+  (`SteamLogin` in PassbyCore, with tests; Steam answers `is_valid:false` to a made-up one,
+  checked against the real service).
+- As with Spotify, the login is kept (the Steam ID, in the Keychain) and the three most-played
+  games, and the one played last for the card, are read again each time the app opens
+  (`PlazaState.setTopGames`, tested). Logged in, the Steam screen shows the list and "Log out
+  of Steam"; Settings marks the row "Logged in".
+- Signing in does not give access to private data: games are still read with the Steam Web API
+  key, so a person's game details must be public. When they are not, the login is not kept and
+  the app says where in Steam to change it.
+- Looking a profile up by link or name, and typing three games, both still work.
+
+Checked in the simulator: the sheet opens Steam's real page and Cancel comes back; with a
+public profile's ID planted as if logged in (`-steamid`, debug builds only), the games arrive
+when the app opens, the logged-in screen lists them and logging out returns to the entry
+screen. Not checked, because it needs a real Steam account: the sign-in itself, Steam handing
+back to `https://passby/steam`, and the confirmation of a genuine sign-in.

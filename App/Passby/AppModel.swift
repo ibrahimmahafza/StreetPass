@@ -49,6 +49,11 @@ final class AppModel {
     /// What each person holds on this phone when it is not what they chose themselves: the thing you
     /// have in common with them. Worked out again whenever anything it depends on changes.
     private(set) var held: [UUID: Holding] = [:]
+    /// Whether a Steam login is being kept. While it is, the games are fetched again each time the
+    /// app is opened, and are not edited by hand.
+    private(set) var steamLoggedIn = false
+    @ObservationIgnored private var refreshingSteam = false
+    @ObservationIgnored private var steamRefreshed = Date.distantPast
     @ObservationIgnored private var refreshingSpotify = false
     @ObservationIgnored private var spotifyRefreshed = Date.distantPast
     /// `-spotifydemo` shows the app as logged in to Spotify without a login, for screenshots.
@@ -120,11 +125,16 @@ final class AppModel {
         if let demo { seed(for: demo) }
         try? store.save(state)
         // A login left behind by an earlier install, or by a reset, does not carry over to a fresh start.
-        if state.me == nil || arguments.contains("-reset") { SpotifyLink.logOut() }
+        if state.me == nil || arguments.contains("-reset") {
+            SpotifyLink.logOut()
+            SteamLink.logOut()
+        }
         #if DEBUG
         if let token = value("-spotifytoken") { SpotifyLink.pretendLogin(token) }
+        if let id = value("-steamid") { SteamLink.pretendLogin(id) }
         #endif
         spotifyLoggedIn = demoSpotify || SpotifyLink.isLoggedIn
+        steamLoggedIn = SteamLink.isLoggedIn
         audio.muted = arguments.contains("-mute")
         audioCheck = arguments.contains("-audiocheck")
         let info = Bundle.main.infoDictionary
@@ -188,7 +198,10 @@ final class AppModel {
         audio.setForeground(active)
         if onScreen != active { note("app", active ? "app in front" : "app left the screen") }
         onScreen = active
-        if active { refreshSpotify() }
+        if active {
+            refreshSpotify()
+            refreshSteam()
+        }
         if active, let meeting {
             if meeting.isOver(at: Date()) {
                 // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
@@ -331,6 +344,53 @@ final class AppModel {
         }
     }
 
+    // MARK: Steam
+
+    /// Finishes a sign-in through Steam. Afterwards the app stays logged in. Gives the three
+    /// most-played games and the card for the one played most recently.
+    func logInToSteam(_ claim: SteamLogin.Claim) async throws -> (names: [String], card: Holding?) {
+        let found = try await SteamLink.logIn(claim)
+        steamLoggedIn = SteamLink.isLoggedIn
+        steamRefreshed = Date()
+        return (found.names, found.card?.normalized())
+    }
+
+    /// Forgets the Steam login. The games stay as they are and can be edited by hand again.
+    func logOutOfSteam() {
+        SteamLink.logOut()
+        steamLoggedIn = false
+        note("links", "logged out of Steam")
+    }
+
+    /// While logged in to Steam, reads the games again. Called each time the app comes to the
+    /// front, at most once a minute, like the Spotify one.
+    private func refreshSteam() {
+        guard steamLoggedIn, state.me != nil, !refreshingSteam, Date().timeIntervalSince(steamRefreshed) > 60 else { return }
+        refreshingSteam = true
+        Task { [weak self] in
+            let result: Result<SteamLink.Found, Error>
+            do { result = .success(try await SteamLink.refresh()) } catch { result = .failure(error) }
+            guard let self else { return }
+            self.refreshingSteam = false
+            switch result {
+            case let .success(found):
+                self.steamRefreshed = Date()
+                var s = self.state
+                s.setTopGames(found.names, card: found.card)
+                note("links", s == self.state ? "games are the same as last time" : "games updated")
+                self.state = s
+            case .failure(SteamLink.Failure.loggedOut):
+                self.steamLoggedIn = false
+            case .failure(SteamLink.Failure.isPrivate):
+                // They have since made their games private. The list stays as it was.
+                note("links", "Steam no longer shows this account's games; the list is kept as it was")
+            case .failure:
+                // No signal, or Steam having a bad moment. Try again the next time the app is opened.
+                break
+            }
+        }
+    }
+
     // MARK: In common
 
     /// Works out who holds something you share with them, and looks up the cover of any shared game
@@ -426,6 +486,8 @@ final class AppModel {
         endMeeting()
         SpotifyLink.logOut()
         spotifyLoggedIn = false
+        SteamLink.logOut()
+        steamLoggedIn = false
         state = PlazaState()
         note("app", "started over from the welcome")
     }

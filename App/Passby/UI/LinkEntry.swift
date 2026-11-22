@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Sets your artists or your three games. Typing them always works; logins are offered when available.
 /// Logged in to Spotify, the artists are Spotify's own top ten and keep themselves up to date, so
-/// there is nothing to type and the screen shows the list and a way to log out.
+/// there is nothing to type and the screen shows the list and a way to log out. Logged in to
+/// Steam it is the same with your three most-played games.
 struct LinkEntry: View {
     @Environment(AppModel.self) private var model
 
@@ -26,23 +27,42 @@ struct LinkEntry: View {
     @State private var steamProfile = ""
     @State private var busy = false
     @State private var note: String?
+    /// Whether Steam's sign-in page is up.
+    @State private var signingInToSteam = false
 
     private var cleaned: [String] {
         items.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 
     var body: some View {
-        if kind == .spotify, model.spotifyLoggedIn {
+        if kind == .spotify ? model.spotifyLoggedIn : model.steamLoggedIn {
             loggedIn
         } else {
             entry
+                .sheet(isPresented: $signingInToSteam) {
+                    SteamSignIn { claim in
+                        signingInToSteam = false
+                        guard let claim else { return }
+                        fetch(
+                            "Steam didn't answer. Type them instead.",
+                            hidden: "Steam is keeping this account's games private. In Steam, open Edit Profile, then Privacy, set Game details to Public and log in again. Or type them instead."
+                        ) {
+                            // Steam's list is saved as it is, with nothing left to type.
+                            let got = try await model.logInToSteam(claim)
+                            onDone(got.names, got.card)
+                            return nil
+                        }
+                    }
+                }
         }
     }
 
-    /// What is shown while logged in to Spotify: the list as Spotify gave it, and a way out.
+    /// What is shown while logged in: the list as Spotify or Steam gave it, and a way out.
     private var loggedIn: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Logged in to Spotify. Your top artists update each time you open Passby.")
+            Text(kind == .spotify
+                ? "Logged in to Spotify. Your top artists update each time you open Passby."
+                : "Logged in to Steam. Your most-played games update each time you open Passby.")
                 .font(Theme.font(13.5))
                 .foregroundStyle(Theme.soft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -54,8 +74,8 @@ struct LinkEntry: View {
             .padding(.vertical, 10)
             .padding(.horizontal, 13)
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
-            Button("Log out of Spotify") {
-                model.logOutOfSpotify()
+            Button("Log out of \(kind.name)") {
+                if kind == .spotify { model.logOutOfSpotify() } else { model.logOutOfSteam() }
                 for (i, value) in initial.prefix(3).enumerated() { items[i] = value }
             }
             .buttonStyle(PlainButtonStyleWhite())
@@ -130,6 +150,10 @@ struct LinkEntry: View {
             .buttonStyle(PlainButtonStyleWhite())
             .disabled(busy)
         case .steam where Secrets.steamAPIKey != nil:
+            Button(busy ? "Asking Steam" : "Log in with Steam") { signingInToSteam = true }
+                .buttonStyle(PlainButtonStyleWhite())
+                .disabled(busy)
+            // Looking a profile up by its name still works, for anyone who would rather not log in.
             HStack(spacing: 8) {
                 TextField("Steam profile link or name", text: $steamProfile)
                     .textInputAutocapitalization(.never)
@@ -151,7 +175,7 @@ struct LinkEntry: View {
 
     /// Runs a login. What it gives back goes into the fields to be looked over; nil means it has
     /// already been saved.
-    private func fetch(_ fallback: String?, _ work: @escaping () async throws -> ([String], Holding?)?) {
+    private func fetch(_ fallback: String?, hidden: String = "That Steam profile is private. Type them instead.", _ work: @escaping () async throws -> ([String], Holding?)?) {
         busy = true
         note = nil
         Task {
@@ -162,7 +186,9 @@ struct LinkEntry: View {
                     note = "Found them. Change anything you like, then save."
                 }
             } catch SteamLink.Failure.isPrivate {
-                note = "That Steam profile is private. Type them instead."
+                note = hidden
+            } catch SteamLink.Failure.notConfirmed {
+                note = "Steam could not confirm that login. Try again, or type them instead."
             } catch SteamLink.Failure.notFound, SteamLink.Failure.notAProfile {
                 note = "Couldn't find that Steam profile. Type them instead."
             } catch SpotifyLink.Failure.cancelled {
