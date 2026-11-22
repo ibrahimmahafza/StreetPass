@@ -19,7 +19,6 @@ struct PlazaView: View {
         GeometryReader { geo in
             ZStack {
                 floor
-                IslandGlow(active: !waiting.isEmpty, safeTop: geo.safeAreaInsets.top)
                 controls
                 if let sheet {
                     Color(hex: 0xECF4F7).opacity(0.14)
@@ -34,7 +33,7 @@ struct PlazaView: View {
                 if let meeting = model.meeting, let until = model.popupUntil, until > Date() {
                     IslandPopup(
                         meeting: meeting, until: until, bearing: model.finder.bearing, distance: model.finder.distance,
-                        needsSweep: model.finder.needsSweep, safeTop: geo.safeAreaInsets.top
+                        need: model.finder.need, safeTop: geo.safeAreaInsets.top
                     ) {
                         // Tapping the announcement goes straight to meeting them.
                         if sheet == nil { meet() }
@@ -50,11 +49,15 @@ struct PlazaView: View {
         .onAppear {
             scene.me = model.state.me?.look
             scene.myHolding = model.state.me?.holding
-            scene.sync(model.state.encounters)
+            scene.sync(model.state.encounters, held: model.held)
             openDemoScreen()
         }
         .onChange(of: model.state.encounters) { _, encounters in
-            scene.sync(encounters)
+            scene.sync(encounters, held: model.held)
+        }
+        .onChange(of: model.held) { _, held in
+            // Someone now shares something with you, or no longer does, or its picture was found.
+            scene.sync(model.state.encounters, held: held)
         }
         .onChange(of: model.state.me?.look) { _, look in
             scene.me = look
@@ -116,11 +119,13 @@ struct PlazaView: View {
                 let more = arriving && queue.count > 1
                 CardSheet(
                     encounter: encounter,
+                    shared: model.state.shared(with: encounter),
                     title: arriving ? (encounter.times <= 1 ? "New person" : "You passed again") : "Someone you passed",
                     buttonTitle: arriving ? (more ? "Next person" : "Done") : (fromList ? "Back to the list" : "Close"),
                     primary: more,
                     onButton: { fromList && !arriving ? open(.people) : dismiss() },
                     onClose: dismiss,
+                    onForget: { forget(id) },
                     onLetter: { model.audio.voice(letter: $0, pitch: 60 + Int(id.uuid.0) % 20) }
                 )
                 .id(id)
@@ -165,6 +170,28 @@ struct PlazaView: View {
             scene.talking = nil
             withAnimation(.snappy(duration: 0.3)) { sheet = nil }
         }
+    }
+
+    /// Takes the person whose card is open out of the plaza. In the middle of an arrival the next
+    /// person steps up; from the list it goes back to the list; otherwise the card just closes.
+    private func forget(_ id: UUID) {
+        model.audio.blip()
+        if arriving, queue.first == id {
+            queue.removeFirst()
+            model.forget(id)
+            if let next = queue.first {
+                scene.talking = next
+                withAnimation(.snappy(duration: 0.3)) { sheet = .card(next, arriving: true) }
+            } else {
+                arriving = false
+                scene.talking = nil
+                withAnimation(.snappy(duration: 0.3)) { sheet = nil }
+            }
+            return
+        }
+        model.forget(id)
+        withAnimation(.snappy(duration: 0.3)) { sheet = fromList ? .people : nil }
+        fromList = false
     }
 
     private func meet() {

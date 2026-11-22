@@ -1,11 +1,12 @@
 import ActivityKit
 import Foundation
 
-/// Keeps one Live Activity showing how many people are waiting, which tints the Dynamic Island green,
-/// and for a couple of minutes after someone is detected says "Time to make a new friend".
+/// Keeps one Live Activity that, for a couple of minutes after someone is detected, says
+/// "Time to make a new friend" on the Dynamic Island. The rest of the time it shows nothing there.
 ///
-/// iOS only lets an app start a Live Activity while it is on screen, so it starts as soon as the
-/// app opens and is then updated from the background when a pass comes in over Bluetooth.
+/// It runs all the time anyway because iOS only lets an app start a Live Activity while it is on
+/// screen: it starts as soon as the app opens, empty, and is then filled in from the background
+/// when a pass comes in over Bluetooth.
 @MainActor
 final class LiveActivityController {
     /// Someone detected moments ago, for the island to announce and point at.
@@ -33,7 +34,7 @@ final class LiveActivityController {
     var allowed: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
 
     /// Safe to call as often as you like. `canStart` is whether the app is on screen.
-    func sync(waiting: Int, wanted: Bool, canStart: Bool, meeting: Meet? = nil, announce: Announce = .no) {
+    func sync(wanted: Bool, canStart: Bool, meeting: Meet? = nil, announce: Announce = .no) {
         if activity == nil {
             activity = Activity<PassActivityAttributes>.activities.first { $0.activityState == .active }
         } else if activity?.activityState != .active {
@@ -49,9 +50,9 @@ final class LiveActivityController {
             return
         }
         let state = PassActivityAttributes.ContentState(
-            waiting: waiting, meeting: meeting?.name, bearing: meeting?.bearing, distance: meeting?.distance)
+            meeting: meeting?.name, bearing: meeting?.bearing, distance: meeting?.distance)
         // The announcement expires by itself: once `until` passes, iOS redraws the activity as stale
-        // and the widget goes back to the count, even if the app is not running to tell it to.
+        // and the widget goes back to showing nothing, even if the app is not running to tell it to.
         let content = ActivityContent(state: state, staleDate: meeting?.until)
         if let activity {
             guard announce != .no || shown != state else { return }

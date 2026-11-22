@@ -36,6 +36,22 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(Store(directory: dir).load().encounters.count, 1)
     }
 
+    func testStateSavedBeforePicturesWereKeptStillLoads() throws {
+        var s = PlazaState()
+        s.me = Profile(id: UUID(), name: "Me", look: .starter, instagram: "me", artists: ["A"], games: ["G"], greeting: "Hi")
+        try Store(directory: dir).save(s)
+        let saved = try String(contentsOf: dir.appendingPathComponent("state.json"), encoding: .utf8)
+        XCTAssertFalse(saved.contains("pictures"))
+        XCTAssertEqual(Store(directory: dir).load().me?.name, "Me")
+    }
+
+    func testKnownPicturesAreKept() throws {
+        var s = PlazaState()
+        s.pictures = PictureBook(artists: ["stromae": "ab67616d00001e020123456789abcdef01234567"], games: ["hades": "1145360"])
+        try Store(directory: dir).save(s)
+        XCTAssertEqual(Store(directory: dir).load().pictures, s.pictures)
+    }
+
     func testMissingFileLoadsEmpty() {
         XCTAssertEqual(Store(directory: dir).load(), PlazaState())
     }

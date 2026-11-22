@@ -36,11 +36,11 @@ final class ProfileWireTests: XCTestCase {
     }
 
     func testDecodeTrimsOversizedFields() {
-        let artists = (0..<10).map { "\"Artist \($0)\"" }.joined(separator: ",")
+        let artists = (0..<12).map { "\"Artist \($0)\"" }.joined(separator: ",")
         let json = "{\"v\":1,\"i\":\"\(fixedID)\",\"n\":\"  Theo  \",\"l\":[99,-1,8,5,5,10,6],\"g\":\"@theo.wav\",\"a\":[\(artists)],\"p\":[],\"h\":\"hi\"}"
         let p = Profile(wireData: Data(json.utf8))
         XCTAssertEqual(p?.name, "Theo")
-        XCTAssertEqual(p?.artists, ["Artist 0", "Artist 1", "Artist 2"])
+        XCTAssertEqual(p?.artists, (0..<10).map { "Artist \($0)" })
         XCTAssertEqual(p?.games, [])
         XCTAssertEqual(p?.instagram, "theo.wav")
         XCTAssertEqual(p?.look, Look(skin: 3, hair: 7, hairColor: 0, eyes: 0, mouth: 0, hoodie: 0, extra: 0))
@@ -60,6 +60,40 @@ final class ProfileWireTests: XCTestCase {
         XCTAssertNil(Profile(wireData: Data(blankName.utf8)))
         let badID = "{\"v\":1,\"i\":\"nope\",\"n\":\"A\",\"l\":[0,0,0,0,0,0,0],\"g\":\"\",\"a\":[],\"p\":[],\"h\":\"\"}"
         XCTAssertNil(Profile(wireData: Data(badID.utf8)))
+    }
+
+    // MARK: Ten artists
+
+    private let ten = ["Stromae", "Kaytranada", "SZA", "Daft Punk", "Tyler, The Creator", "Frank Ocean", "Gorillaz", "Tame Impala", "Dua Lipa", "Radiohead"]
+
+    func testTenArtistsTravelAndGamesStayAtThree() {
+        var p = sample()
+        p.artists = ten + ["One Too Many"]
+        p.games = ["Stardew Valley", "Hades", "Celeste", "Balatro"]
+        p.holding = Holding(kind: .artist, title: "Stromae", picture: "ab6761610000e5eb0123456789abcdef01234567")
+        let back = Profile(wireData: p.wireData())
+        XCTAssertEqual(back?.artists, ten)
+        XCTAssertEqual(back?.games, ["Stardew Valley", "Hades", "Celeste"])
+        XCTAssertEqual(back?.greeting, p.greeting)
+        XCTAssertEqual(back?.holding, p.holding)
+    }
+
+    func testWhenTenArtistsDoNotFitTheLastOnesGoBeforeAnythingElse() {
+        var p = sample()
+        p.artists = (0..<10).map { "Artist number \($0) with a very long name" }
+        p.greeting = String(repeating: "Hello there. ", count: 6)
+        p.holding = Holding(kind: .artist, title: p.artists[0], picture: "ab6761610000e5eb0123456789abcdef01234567")
+        let data = p.wireData()
+        XCTAssertLessThanOrEqual(data.count, Profile.maxWireBytes)
+        let back = Profile(wireData: data)
+        let kept = back?.artists ?? []
+        XCTAssertGreaterThanOrEqual(kept.count, 3)
+        XCTAssertLessThan(kept.count, 10)
+        XCTAssertEqual(kept, Array(p.normalized().artists.prefix(kept.count)))
+        XCTAssertEqual(back?.greeting, p.normalized().greeting)
+        XCTAssertEqual(back?.games, p.games)
+        XCTAssertEqual(back?.instagram, p.instagram)
+        XCTAssertEqual(back?.holding?.picture, p.holding?.picture)
     }
 
     func testInstagramLosesLeadingAt() {

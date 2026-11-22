@@ -33,7 +33,9 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
     static let nameBytes = 24
     static let instagramBytes = 30
     static let itemBytes = 36
-    static let itemCount = 3
+    /// Up to ten artists, which is what a Spotify login gives, and three games.
+    public static let artistCount = 10
+    public static let gameCount = 3
     static let greetingBytes = 80
 
     /// Trimmed and capped so it fits on a card and on the wire.
@@ -43,8 +45,8 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
         var handle = instagram.trimmingCharacters(in: .whitespacesAndNewlines)
         while handle.hasPrefix("@") { handle.removeFirst() }
         p.instagram = Self.clean(handle, maxBytes: Self.instagramBytes)
-        p.artists = Self.cleanList(artists)
-        p.games = Self.cleanList(games)
+        p.artists = Self.cleanList(artists, count: Self.artistCount)
+        p.games = Self.cleanList(games, count: Self.gameCount)
         p.greeting = Self.clean(greeting, maxBytes: Self.greetingBytes)
         p.look = look.clamped()
         p.holding = holding?.normalized()
@@ -64,8 +66,8 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
         return out.trimmingCharacters(in: .whitespaces)
     }
 
-    private static func cleanList(_ items: [String]) -> [String] {
-        Array(items.map { clean($0, maxBytes: itemBytes) }.filter { !$0.isEmpty }.prefix(itemCount))
+    private static func cleanList(_ items: [String], count: Int) -> [String] {
+        Array(items.map { clean($0, maxBytes: itemBytes) }.filter { !$0.isEmpty }.prefix(count))
     }
 
     /// Compact JSON, never more than `maxWireBytes`.
@@ -76,9 +78,15 @@ public struct Profile: Codable, Equatable, Identifiable, Sendable {
 
         var p = normalized()
         var data = encode(p)
+        // Ten artists with long names can be more than fits. The ones furthest down the list go first,
+        // one at a time, until three are left.
+        while data.count > Self.maxWireBytes, p.artists.count > 3 {
+            p.artists.removeLast()
+            data = encode(p)
+        }
         // Quotes and backslashes double in size once escaped, so shed the least important parts until it fits.
         let reductions: [(inout Profile) -> Void] = [
-            // With a picture to show, the name of what is held is the first thing to go.
+            // With a picture to show, the name of what is held is the next thing to go.
             { if $0.holding?.picture != nil { $0.holding?.title = "" } },
             { $0.greeting = "" },
             { $0.artists = Array($0.artists.prefix(2)); $0.games = Array($0.games.prefix(2)) },

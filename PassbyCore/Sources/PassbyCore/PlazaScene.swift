@@ -127,13 +127,16 @@ public final class PlazaScene {
 
     // MARK: People
 
-    public func sync(_ encounters: [Encounter]) {
+    /// `held` gives some people something else to hold on this phone than what they chose themselves,
+    /// which is how someone comes to hold up the thing you have in common.
+    public func sync(_ encounters: [Encounter], held: [UUID: Holding] = [:]) {
         let ids = Set(encounters.map(\.id))
         walkers.removeAll { !ids.contains($0.id) }
         for e in encounters {
+            let holding = held[e.id] ?? e.profile.holding
             if let i = walkers.firstIndex(where: { $0.id == e.id }) {
                 walkers[i].look = e.profile.look
-                walkers[i].holding = e.profile.holding
+                walkers[i].holding = holding
                 if e.waiting, walkers[i].mode == .wandering {
                     walkers[i].mode = .waiting
                     walkers[i].moving = false
@@ -144,7 +147,7 @@ public final class PlazaScene {
                 }
             } else {
                 var w = Walker(
-                    id: e.id, look: e.profile.look, holding: e.profile.holding, wait: .random(in: 0...4, using: &rng),
+                    id: e.id, look: e.profile.look, holding: holding, wait: .random(in: 0...4, using: &rng),
                     phase: .random(in: 0...6, using: &rng), mode: e.waiting ? .waiting : .wandering)
                 if !e.waiting { w.spot = startingSpot() }
                 w.heading = towardsViewer(from: w.spot)

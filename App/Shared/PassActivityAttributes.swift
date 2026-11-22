@@ -1,13 +1,12 @@
 import ActivityKit
 
-/// The Live Activity that turns the Dynamic Island outline green.
+/// The Live Activity that announces someone on the Dynamic Island. Between meetings it carries
+/// nothing and the island is left alone.
 struct PassActivityAttributes: ActivityAttributes {
     /// What the app and the island both say when someone has just been detected.
     static let meetingTitle = "Time to make a new friend"
 
     struct ContentState: Codable, Hashable {
-        /// How many people are waiting to be met.
-        var waiting: Int
         /// The name of someone detected a moment ago, while the island says "Time to make a new friend".
         /// The activity is given a stale date for the end of that time, so the island drops it by itself.
         var meeting: String?

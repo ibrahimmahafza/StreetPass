@@ -2,72 +2,91 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-/// The Live Activity. Normally it is the green outline and a count on the Dynamic Island. For a couple
-/// of minutes after someone is detected it says "Time to make a new friend" and shows where they are:
-/// an arrow when the phone can tell the direction, otherwise how far away they are.
+/// The Live Activity. Most of the time it draws nothing on the Dynamic Island. It is only kept
+/// running because iOS will not let an app start one from the background, and a pass can arrive
+/// with the phone in a pocket. For a couple of minutes after someone is detected it says
+/// "Time to make a new friend" and shows where they are: an arrow when the phone can tell the
+/// direction, otherwise how far away they are.
 struct PassActivityWidget: Widget {
     private static let green = Color(red: 0.184, green: 0.89, blue: 0.42)
-    private static let idle = Color(white: 0.55)
+    /// What the Lock Screen row and a long press on the island say between meetings.
+    private static let quietLine = "People you pass show up here"
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PassActivityAttributes.self) { context in
-            let meeting = Self.meeting(context)
-            HStack(spacing: 12) {
-                if meeting != nil {
+            if let meeting = Self.meeting(context) {
+                HStack(spacing: 12) {
                     Self.pointer(context.state, size: 26)
-                } else {
-                    Self.dot(context.state.waiting, size: 12)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(meeting != nil ? PassActivityAttributes.meetingTitle : Self.line(context.state.waiting))
-                        .font(.system(.body, design: .rounded).weight(.semibold))
-                    if let meeting {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(PassActivityAttributes.meetingTitle)
+                            .font(.system(.body, design: .rounded).weight(.semibold))
                         Text(Self.detail(meeting, context.state))
                             .font(.system(.footnote, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
+                .padding(16)
+            } else {
+                // iOS gives every Live Activity a row on the Lock Screen, so between meetings it is one small line.
+                Text(Self.quietLine)
+                    .font(.system(.footnote, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
             }
-            .padding(16)
         } dynamicIsland: { context in
-            let waiting = context.state.waiting
             let meeting = Self.meeting(context)
-            return DynamicIsland {
+            let island = DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     if meeting != nil {
                         Self.pointer(context.state, size: 34).padding(.leading, 6)
                     }
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    VStack(spacing: 2) {
-                        Text(meeting != nil ? PassActivityAttributes.meetingTitle : Self.line(waiting))
-                            .font(.system(.body, design: .rounded).weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        if let meeting {
+                    if let meeting {
+                        VStack(spacing: 2) {
+                            Text(PassActivityAttributes.meetingTitle)
+                                .font(.system(.body, design: .rounded).weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             Text(Self.detail(meeting, context.state))
                                 .font(.system(.footnote, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
+                        .padding(.vertical, 6)
+                    } else {
+                        // Only seen by pressing and holding the island between meetings.
+                        Text(Self.quietLine)
+                            .font(.system(.footnote, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .padding(.vertical, 6)
                     }
-                    .padding(.vertical, 6)
                 }
             } compactLeading: {
-                Self.dot(max(waiting, meeting == nil ? 0 : 1), size: 10).padding(.leading, 3)
+                if meeting != nil {
+                    Circle().fill(Self.green).frame(width: 10, height: 10).padding(.leading, 3)
+                }
             } compactTrailing: {
                 if meeting != nil {
                     Self.pointer(context.state, size: 16)
-                } else if waiting > 0 {
-                    Text("\(waiting)")
-                        .font(.system(.body, design: .rounded).weight(.bold))
-                        .foregroundStyle(Self.green)
                 }
             } minimal: {
-                Self.dot(max(waiting, meeting == nil ? 0 : 1), size: 10)
+                if meeting != nil {
+                    Circle().fill(Self.green).frame(width: 10, height: 10)
+                }
             }
-            .keylineTint(waiting > 0 || meeting != nil ? Self.green : nil)
+            .keylineTint(meeting != nil ? Self.green : nil)
+            guard meeting == nil else { return island }
+            // Between meetings, no room is kept for content either side of the camera, so the
+            // island is as near its bare shape as iOS allows.
+            return island
+                .contentMargins(.all, 0, for: .compactLeading)
+                .contentMargins(.all, 0, for: .compactTrailing)
+                .contentMargins(.all, 0, for: .minimal)
         }
     }
 
@@ -106,19 +125,5 @@ struct PassActivityWidget: Widget {
         guard let distance = state.distance else { return "\(name) is nearby" }
         if distance < 0.95 { return "\(name) is right next to you" }
         return "\(name) is \(Int(distance.rounded())) m away"
-    }
-
-    private static func dot(_ waiting: Int, size: CGFloat) -> some View {
-        Circle()
-            .fill(waiting > 0 ? green : idle)
-            .frame(width: size, height: size)
-    }
-
-    private static func line(_ waiting: Int) -> String {
-        switch waiting {
-        case 0: "Looking for people nearby"
-        case 1: "1 person passed you"
-        default: "\(waiting) people passed you"
-        }
     }
 }

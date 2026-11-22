@@ -40,8 +40,57 @@ public struct PlazaState: Codable, Equatable, Sendable {
     /// Which one you are holding, if either, is `me.holding`.
     public var artistCard: Holding?
     public var gameCard: Holding?
+    /// The pictures this phone knows for artists and games, by name. Missing in older saved states.
+    public var pictures: PictureBook?
 
     public init() {}
+
+    // MARK: Your top artists
+
+    /// Spotify sent a fresh list of your top artists. It replaces yours, the favourite becomes your
+    /// artist card, and it goes in your hands if you were holding the old favourite. Whatever else
+    /// you chose to hold, or nothing, is left alone.
+    public mutating func setTopArtists(_ artists: [SpotifyReply.Artist]) {
+        guard var mine = me, let favourite = artists.first else { return }
+        let card = Holding(kind: .artist, title: favourite.name, picture: favourite.picture).normalized()
+        mine.artists = artists.map(\.name)
+        if mine.holding == artistCard, artistCard != nil { mine.holding = card }
+        me = mine.normalized()
+        artistCard = card
+        spotifyLinked = true
+        remember(artists)
+    }
+
+    /// Keeps the picture that came with each artist, so it can be shown when someone shares them.
+    /// Works before there is a profile, for someone who logs in to Spotify while still setting up.
+    public mutating func remember(_ artists: [SpotifyReply.Artist]) {
+        var book = pictures ?? PictureBook()
+        for artist in artists.prefix(Profile.artistCount) {
+            if let picture = artist.picture { book.learn(.artist, artist.name, picture: picture) }
+        }
+        if book != PictureBook() || pictures != nil { pictures = book }
+    }
+
+    /// Keeps the picture on a card of your own, if it has one.
+    public mutating func remember(_ card: Holding?) {
+        guard let card, card.picture != nil else { return }
+        var book = pictures ?? PictureBook()
+        book.learn(card)
+        if book != PictureBook() || pictures != nil { pictures = book }
+    }
+
+    // MARK: What you have in common
+
+    /// What you and this person both list, the best match first.
+    public func shared(with encounter: Encounter) -> [Common.Shared] {
+        me.map { Common.shared(me: $0, them: encounter.profile) } ?? []
+    }
+
+    /// What this person's character holds on your phone: the first thing you have in common, with
+    /// whatever picture is known for it, otherwise what they chose to hold themselves.
+    public func held(by encounter: Encounter) -> Holding? {
+        Common.holding(of: encounter.profile, me: me, pictures: pictures ?? PictureBook())
+    }
 
     /// Someone counts as passed again only after their phone has been out of sight this long.
     /// Two phones left next to each other keep seeing each other, so they stay one pass.
@@ -72,6 +121,11 @@ public struct PlazaState: Codable, Equatable, Sendable {
     /// Empties the plaza. Your own profile and settings stay.
     public mutating func forgetEveryone() {
         encounters = []
+    }
+
+    /// Takes one person out of the plaza. If you pass them again they are new again.
+    public mutating func forget(_ id: UUID) {
+        encounters.removeAll { $0.id == id }
     }
 
     public mutating func greet(_ id: UUID) {

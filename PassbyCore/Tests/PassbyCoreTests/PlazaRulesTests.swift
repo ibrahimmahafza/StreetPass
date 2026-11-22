@@ -82,6 +82,30 @@ final class PlazaRulesTests: XCTestCase {
         XCTAssertEqual(s.me, me)
     }
 
+    func testForgettingOnePersonLeavesEveryoneElse() {
+        var s = PlazaState()
+        let a = person("A"), b = person("B"), c = person("C")
+        for p in [a, b, c] { _ = s.recordPass(p, at: t0) }
+        s.forget(b.id)
+        XCTAssertEqual(s.encounters.map(\.id), [a.id, c.id])
+        // Forgetting someone who is not there changes nothing.
+        let before = s
+        s.forget(UUID())
+        XCTAssertEqual(s, before)
+    }
+
+    func testSomeoneForgottenIsNewAgainTheNextTimeYouPass() {
+        var s = PlazaState()
+        let a = person("A")
+        _ = s.recordPass(a, at: t0)
+        s.greet(a.id)
+        s.forget(a.id)
+        XCTAssertEqual(s.recordPass(a, at: t0.addingTimeInterval(5)), .new)
+        XCTAssertEqual(s.encounters.count, 1)
+        XCTAssertEqual(s.encounters[0].times, 1)
+        XCTAssertTrue(s.encounters[0].waiting)
+    }
+
     func testOwnProfileIsIgnored() {
         var s = PlazaState()
         let me = person("Me")

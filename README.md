@@ -1,8 +1,8 @@
 # Passby
 
 Walk past someone who also has the app and your phones swap a small profile over
-Bluetooth. Next time you open the app, they are waiting in your plaza to say hello,
-and the outline of the Dynamic Island glows green until you meet them.
+Bluetooth. The Dynamic Island opens to say "Time to make a new friend", and next time
+you open the app they are waiting in your plaza to say hello.
 
 Built for a hackathon with the theme "undo": bringing back the passing-by experience
 of early-2010s handhelds. The characters, plaza, sounds and music are original to this
@@ -18,14 +18,23 @@ app; nothing here comes from the games that inspired it.
 - People in the plaza are solid and nobody is ever pushed: someone standing stays put, someone
   walking goes round whoever is in the way, turns before stepping and only steps forwards.
 - The plaza moves like a map: drag to slide it, pinch to zoom, twist two fingers to turn it.
-- Characters hold up a small square picture: their favourite artist (from a Spotify login) or
-  the game they played most recently (from Steam). Typed-in games get their cover looked up by
-  name; anything without a picture gets a plain card with a music note or a game pad. You
-  choose which to hold, or nothing, on your character sheet.
+- Characters hold up a small square picture: an album cover for their favourite artist (from a
+  Spotify login) or the cover of the game they played most recently (from Steam). Typed-in games
+  get their cover looked up by name; anything without a picture gets a plain card with a music
+  note or a game pad. You choose which to hold, or nothing, on your character sheet.
+- When someone you passed lists an artist or a game that you list too, their character holds
+  that instead on your phone, and their card says "You both like ..." with the shared names in
+  green. Your own character keeps holding what you chose.
+- A Spotify login stays logged in. Each time the app is opened it fetches your top ten artists
+  again, so the list and the card in your hands keep up with what you listen to.
 - "Meet them": new people walk up one at a time with a card showing their name,
-  Instagram, three artists, three games and how often you have passed.
-- A Live Activity that shows a green dot and count in the Dynamic Island, plus a green
-  outline drawn around the island inside the app.
+  Instagram, up to ten artists, three games and how often you have passed.
+- Each person's card has "Forget" at the bottom, which takes just that person out of your
+  plaza after asking once. If you pass them again they are new again.
+- The Dynamic Island is left alone until someone is detected: no dot, no count, no outline.
+  A Live Activity still runs the whole time, because iOS will not let an app start one from
+  the background, but between meetings it draws nothing on the island and is one small line
+  on the Lock Screen.
 - When two phones detect each other, "Time to make a new friend" comes up. Inside the app it
   is a panel that opens out of the island for 15 seconds, with an arrow that turns towards
   the other person on phones that can tell. With the app in the background the island keeps
@@ -85,7 +94,7 @@ The app keeps a running record of what Bluetooth, ranging and the island did.
 
 1. Two phones with the app installed, both through onboarding, Bluetooth on.
 2. Open the app on both and bring them near each other. Within a few seconds each
-   plays the arrival jingle and its island outline turns green.
+   plays the arrival jingle and shows "Time to make a new friend".
 3. Press "Meet them" on either phone.
 4. To show the island outside the app, pass someone, then go to the home screen.
 
@@ -111,9 +120,17 @@ copy `App/Secrets.example.plist` to `App/Passby/Resources/Secrets.plist` and fil
 - `SpotifyClientID`: from an app in the Spotify developer dashboard, with the redirect
   URI `passby://spotify`. While that app is in development mode, only the few Spotify
   accounts you add to it can log in (five at the time of writing, and the app owner
-  needs Premium), so judges will end up typing.
+  needs Premium), so judges will end up typing. Anyone else gets as far as Spotify's
+  login page, then Spotify refuses to answer for them and the app says "Spotify only
+  lets a few listed accounts log in to Passby for now. Type them instead."
 - `SteamAPIKey`: from steamcommunity.com/dev/apikey. The person's Steam profile and
   game details must be public.
+
+A Spotify login gives the top ten artists of roughly the last six months, each with the
+cover of the album the person's most played song by that artist is on (or the artist's
+photo when there is no such song). The login is kept in the Keychain, so the list is
+fetched again each time the app is opened until the person logs out in Settings. People
+who type instead still list three.
 
 `Secrets.plist` is ignored by git but ships inside the app, so do not hand a build with
 your Steam key to strangers. The tools pick the file up by themselves; if you build from

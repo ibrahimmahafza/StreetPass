@@ -193,3 +193,123 @@ connections. The idea is done with this app's own characters; nothing is copied 
   thing linked replaces it; the character sheet has a row to switch or hold nothing; people who
   set up in an earlier build get a card for what they had already listed.
 
+## The island stays quiet between meetings (2026-11-21)
+
+Achraf, after hearing what the island does when nobody is being announced: "the always-on
+indicator is unnecessary", then "let's ditch all passive stuff on the island including the
+indicator". This replaces the green outline for people waiting that was decided at the start.
+
+- Gone: the grey dot and "Looking for people nearby", the green dot, count and outline for
+  people not met yet, and the green outline the app drew around the island inside the app.
+  People waiting are still shown in the plaza itself (the line above "Meet them").
+- Kept: everything during a meeting, as before.
+- The Live Activity keeps running with nothing in it. iOS only lets an app start one while it
+  is on screen, so without it a pass that arrives with the phone in a pocket could not put
+  anything on the island. Dropping it altogether (a plain notification instead) and starting
+  it by server push were the other two ways; he picked this one.
+- What iOS still shows for an empty activity, which an app cannot remove: a row on the Lock
+  Screen (one small line, "People you pass show up here"), and the same line if the island is
+  pressed and held.
+- Seen in the simulator (iPhone 17 Pro, iOS 26.5): with the empty activity the island is a plain
+  black pill about 10 points wider than the bare one (135 against 125), and that is with the
+  room for content either side of the camera set to nothing; iOS does not go lower. After the
+  two minutes of a meeting the island goes back to nothing by itself, 20 to 40 seconds late
+  when the app is asleep, because iOS applies the end time when it gets round to it.
+- Not dealt with: iOS takes any Live Activity off the island after eight hours and the app can
+  only start it again when it is next opened, so a pass after that is recorded but not announced.
+
+## The Spotify and Steam keys arrived (2026-11-21, build 5)
+
+Achraf sent a Spotify client ID and a Steam Web API key. They are in
+`App/Passby/Resources/Secrets.plist`, which git ignores and which ships inside the build.
+
+- Steam, checked end to end in the simulator with a public profile: the three most played
+  games fill in and the character holds the cover of the game played last.
+- Spotify, checked as far as it goes without logging in to someone's account: Spotify knows
+  the client ID, the developer dashboard lists the redirect `passby://spotify`, Spotify shows
+  its "allow" page for the app (called "Passerby" there), and the button in the app opens
+  Spotify's login page. What happens after a real login has not been run.
+- The Spotify app is in development mode with nobody on its list of allowed accounts (the
+  limit is five, and the owner needs Premium). Spotify lets anyone log in and then answers
+  403 for accounts that are not listed. The app used to call every failure "Spotify didn't
+  answer"; it now says that only a few listed accounts can log in, says so separately when
+  an account has no top artists yet, and writes the status and Spotify's own reason to the
+  diagnostics log. Reading the answer moved into `SpotifyReply` in PassbyCore, with tests.
+
+
+
+## Staying logged in to Spotify, ten artists, and holding what you share (2026-11-21, build 6)
+
+Achraf asked for three things: "the user stays logged in and every time they open the app it
+updates the top artists list", "expand it up to top 10 artists not just 3", and "if the users
+have something in common, eg a game or an artist, that the character holds the cover of the
+thing they have in common such as an album cover".
+
+What was built, and the choices that were mine:
+
+- **Staying logged in.** Spotify's login gives a token to ask again with. It is kept in the
+  Keychain (this phone only) and swapped for the new one Spotify sends each time it is used.
+  Each time the app comes to the front the top artists are fetched again, at most once a
+  minute. If Spotify stops accepting the login the app forgets it and keeps the last list;
+  logging in again is in Settings. A login is only kept once Spotify has answered for the
+  account, and a login left over from an earlier install is dropped at a fresh start.
+- **Logged in, the list is Spotify's.** There is nothing to type: the Spotify screen shows the
+  ten names and "Log out of Spotify". Logged out, the three fields are back. People who never
+  log in still type three.
+- **Ten artists.** A profile carries up to ten artists and still three games (he asked for ten
+  artists only). Everything still travels in one Bluetooth value of 512 bytes, so when ten
+  long names do not fit, the ones furthest down the list are left out first, never fewer than
+  three before anything else is cut. Older builds read the first three.
+- **Album covers.** The picture for an artist is the cover of the album their most played song
+  is on, taken from the person's top songs, with the artist's photo as the fallback. This is
+  my reading of "such as an album cover".
+- **In common.** Names are compared without regard to capitals, accents, punctuation or
+  spacing. With several things in common the one highest up both lists wins, an artist before
+  a game when level. On your phone the other person's character holds that, and their card
+  says "You both like ...". Your own character keeps what you chose.
+- **Where the shared picture comes from.** Pictures are not sent between phones beyond the one
+  each person already holds, because ten of them do not fit in the Bluetooth value. The phone
+  uses, in order: the other person's own picture if the shared thing is what they hold, the
+  picture this phone has for it (every artist from your own Spotify login, your own game
+  covers), and for a game the Steam shop's search by name. Otherwise it is a plain card with
+  the name. So someone who typed their artists by hand sees a plain card for a shared artist
+  unless it is the other person's favourite.
+
+Checked in the simulator: ten artists on the Spotify screen and on a card, people holding the
+shared album or game cover with pictures fetched from Spotify and Steam, logging out, and a
+made-up login being turned down by Spotify and forgotten. Not checked, because it needs a real
+Spotify login: logging in, the list coming back with covers, and the fetch on opening the app
+succeeding.
+
+## No arrow, though distance works (2026-11-21, build 7)
+
+Achraf reported no direction arrow on the island, then none in the app either, "though distance
+works".
+
+- On the island there cannot be one. Apple's documentation for `sessionWasSuspended` says iOS
+  suspends ranging between two phones when the app goes to the background, and the island only
+  shows then. This corrects the earlier note that the island could show distance in the
+  background: it gets neither, and shows the waving figure.
+- In the app, iPhone 14 and later only get a direction with the camera's help, and Apple's
+  documentation says the app has to coach the person to move the phone about before it
+  settles. The announcement only showed that instruction while there was no distance, and
+  distance arrives almost at once, so nobody was ever told. Now the line under the title gives
+  the distance and what the phone needs ("Move your phone slowly from side to side"), from
+  the first moment and following what iOS says is missing: side to side, up and down, any
+  movement, more light, getting closer, or allowing the camera in Settings. The wording is in
+  `Bearing.line` in PassbyCore, with tests.
+- The diagnostics log now records whether camera access is allowed when ranging starts, and
+  what iOS says is missing each time that changes.
+
+Not confirmed on a phone: that moving the phone about is all that was missing. If the arrow
+still does not appear, the diagnostics log from that phone says which part fails.
+
+## Forgetting one person (2026-11-21, build 8)
+
+Achraf: "we should be able to forget/remove people individually too (on their profile)".
+Every person's card now ends with "Forget <name>". It asks once, then takes that person out of
+the plaza: from the list it goes back to the list, in the middle of meeting new people the next
+one steps up, otherwise the card closes. An announcement about them ends too. As with "Forget
+everyone", nothing is blocked: a phone that is still in range, or passes again later, comes
+back as a new person (my choice; he did not say which he wanted).
+

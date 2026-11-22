@@ -1,8 +1,12 @@
 import PassbyCore
 import SwiftUI
 
-/// Sets your three artists or three games. Typing them always works; logins are offered when available.
+/// Sets your artists or your three games. Typing them always works; logins are offered when available.
+/// Logged in to Spotify, the artists are Spotify's own top ten and keep themselves up to date, so
+/// there is nothing to type and the screen shows the list and a way to log out.
 struct LinkEntry: View {
+    @Environment(AppModel.self) private var model
+
     enum Kind {
         case spotify, steam
 
@@ -28,6 +32,54 @@ struct LinkEntry: View {
     }
 
     var body: some View {
+        if kind == .spotify, model.spotifyLoggedIn {
+            loggedIn
+        } else {
+            entry
+        }
+    }
+
+    /// What is shown while logged in to Spotify: the list as Spotify gave it, and a way out.
+    private var loggedIn: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Logged in to Spotify. Your top artists update each time you open Passby.")
+                .font(Theme.font(13.5))
+                .foregroundStyle(Theme.soft)
+                .fixedSize(horizontal: false, vertical: true)
+            let half = (initial.count + 1) / 2
+            HStack(alignment: .top, spacing: 12) {
+                ranked(Array(initial.prefix(half)), from: 1)
+                ranked(Array(initial.dropFirst(half)), from: half + 1)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 13)
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
+            Button("Log out of Spotify") {
+                model.logOutOfSpotify()
+                for (i, value) in initial.prefix(3).enumerated() { items[i] = value }
+            }
+            .buttonStyle(PlainButtonStyleWhite())
+        }
+    }
+
+    private func ranked(_ names: [String], from first: Int) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(names.enumerated()), id: \.offset) { i, name in
+                HStack(spacing: 6) {
+                    Text("\(first + i)")
+                        .font(Theme.font(12.5, .bold))
+                        .foregroundStyle(Theme.soft)
+                        .frame(width: 18, alignment: .trailing)
+                    Text(name)
+                        .font(Theme.font(14.5))
+                        .lineLimit(1)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var entry: some View {
         VStack(alignment: .leading, spacing: 8) {
             login
             if let note {
@@ -69,8 +121,10 @@ struct LinkEntry: View {
         case .spotify where Secrets.spotifyClientID != nil:
             Button(busy ? "Asking Spotify" : "Log in with Spotify") {
                 fetch("Spotify didn't answer. Type them instead.") {
-                    let got = try await SpotifyLink.topArtists()
-                    return (got.names, got.card)
+                    // Spotify's list is saved as it is: all ten, with nothing left to type.
+                    let got = try await model.logInToSpotify()
+                    onDone(got.names, got.card)
+                    return nil
                 }
             }
             .buttonStyle(PlainButtonStyleWhite())
@@ -95,21 +149,28 @@ struct LinkEntry: View {
         }
     }
 
-    private func fetch(_ fallback: String?, _ work: @escaping () async throws -> ([String], Holding?)) {
+    /// Runs a login. What it gives back goes into the fields to be looked over; nil means it has
+    /// already been saved.
+    private func fetch(_ fallback: String?, _ work: @escaping () async throws -> ([String], Holding?)?) {
         busy = true
         note = nil
         Task {
             do {
-                let (names, card) = try await work()
-                for i in 0..<3 { items[i] = i < names.count ? names[i] : "" }
-                found = card
-                note = "Found them. Change anything you like, then save."
+                if let (names, card) = try await work() {
+                    for i in 0..<3 { items[i] = i < names.count ? names[i] : "" }
+                    found = card
+                    note = "Found them. Change anything you like, then save."
+                }
             } catch SteamLink.Failure.isPrivate {
                 note = "That Steam profile is private. Type them instead."
             } catch SteamLink.Failure.notFound, SteamLink.Failure.notAProfile {
                 note = "Couldn't find that Steam profile. Type them instead."
             } catch SpotifyLink.Failure.cancelled {
                 note = nil
+            } catch SpotifyLink.Failure.notListed {
+                note = "Spotify only lets a few listed accounts log in to Passby for now. Type them instead."
+            } catch SpotifyLink.Failure.nothingYet {
+                note = "Spotify has no top artists for this account yet. Type them instead."
             } catch {
                 note = fallback ?? "Steam didn't answer. Type them instead."
             }

@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 @preconcurrency import NearbyInteraction
 import PassbyCore
@@ -13,8 +14,10 @@ final class NearbyFinder: NSObject {
     private(set) var bearing: Double?
     /// Metres to the other phone, or nil when unknown.
     private(set) var distance: Double?
-    /// True while the phone needs to be moved around before it can tell the direction.
-    private(set) var needsSweep = false
+    /// What the phone still needs before it can tell the direction, or nil when it needs nothing.
+    /// iPhone 14 and later work the direction out with the camera, and that only settles once the
+    /// phone has been moved about, so the person has to be told to do it.
+    private(set) var need: Bearing.Need?
 
     /// Called with this phone's current token (to hand out over Bluetooth), or nil when it has none.
     @ObservationIgnored var onToken: ((Data?) -> Void)?
@@ -80,8 +83,29 @@ final class NearbyFinder: NSObject {
         fixes = 0
         peer = configuration
         paused = false
-        note("ranging", "started ranging\(configuration.isCameraAssistanceEnabled ? " with the camera's help" : "")")
+        need = Self.startingNeed(for: configuration)
+        note("ranging", "started ranging\(configuration.isCameraAssistanceEnabled ? " with the camera's help; camera access: \(Self.cameraAccess)" : "")")
         session.run(configuration)
+    }
+
+    /// With the camera's help there is no direction until the phone has been moved about, so that is
+    /// asked for from the start, before iOS says anything. Without camera access there will be none at all.
+    private static func startingNeed(for configuration: NINearbyPeerConfiguration) -> Bearing.Need? {
+        guard configuration.isCameraAssistanceEnabled else { return nil }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .denied, .restricted: return .camera
+        default: return .moving
+        }
+    }
+
+    private static var cameraAccess: String {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return "allowed"
+        case .notDetermined: return "not asked yet"
+        case .denied: return "refused"
+        case .restricted: return "restricted"
+        @unknown default: return "unknown"
+        }
     }
 
     /// Picks ranging back up with the same person after iOS paused it. A paused session does not
@@ -89,7 +113,8 @@ final class NearbyFinder: NSObject {
     func resume() {
         guard paused, let session, let peer else { return }
         paused = false
-        note("ranging", "starting ranging again")
+        need = Self.startingNeed(for: peer)
+        note("ranging", "starting ranging again\(peer.isCameraAssistanceEnabled ? "; camera access: \(Self.cameraAccess)" : "")")
         session.run(peer)
     }
 
@@ -104,7 +129,7 @@ final class NearbyFinder: NSObject {
         paused = false
         bearing = nil
         distance = nil
-        needsSweep = false
+        need = nil
         prepare()
     }
 
@@ -119,6 +144,14 @@ final class NearbyFinder: NSObject {
                 self?.distance = 2.4 + sin(t * 0.5)
             }
         }
+    }
+
+    /// For screenshots only: a distance but no direction yet, as on a phone that has not been moved about.
+    func demoWaitingForSweep() {
+        demo?.invalidate()
+        bearing = nil
+        distance = 2.4
+        need = .sideToSide
     }
 }
 
@@ -165,6 +198,7 @@ extension NearbyFinder: NISessionDelegate {
             paused = true
             bearing = nil
             distance = nil
+            need = nil
             onFix?()
         }
     }
@@ -180,12 +214,34 @@ extension NearbyFinder: NISessionDelegate {
     nonisolated func session(_ session: NISession, didUpdateAlgorithmConvergence convergence: NIAlgorithmConvergence, for object: NINearbyObject?) {
         MainActor.assumeIsolated {
             guard session === self.session else { return }
-            let settled: Bool
-            if case .converged = convergence.status { settled = true } else { settled = false }
-            if needsSweep == settled {
-                note("ranging", settled ? "direction has settled" : "direction not settled yet; the phone needs moving around")
+            let next: Bearing.Need?
+            switch convergence.status {
+            case .converged:
+                next = nil
+            case let .notConverged(reasons):
+                // iOS says what is missing; ask for the one that matters most. With nothing named, any movement.
+                let wanted: [Bearing.Need] = reasons.compactMap { reason in
+                    switch reason {
+                    case .insufficientLighting: return .light
+                    case .insufficientHorizontalSweep: return .sideToSide
+                    case .insufficientVerticalSweep: return .upAndDown
+                    case .insufficientMovement: return .moving
+                    case .insufficientSignalStrength: return .closer
+                    default: return nil
+                    }
+                }
+                next = Bearing.Need.first(of: wanted) ?? .moving
+            case .unknown:
+                next = need
+            @unknown default:
+                next = need
             }
-            needsSweep = !settled
+            // Without camera access nothing iOS asks for would help, so that stays the thing to fix.
+            let shown = need == .camera && next != nil ? .camera : next
+            if shown != need {
+                note("ranging", shown.map { "direction not settled yet: \($0.asking.lowercased())" } ?? "direction has settled")
+            }
+            need = shown
         }
     }
 
@@ -199,7 +255,7 @@ extension NearbyFinder: NISessionDelegate {
             paused = false
             bearing = nil
             distance = nil
-            needsSweep = false
+            need = nil
             onToken?(nil)
         }
     }

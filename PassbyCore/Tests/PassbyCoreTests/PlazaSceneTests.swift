@@ -234,6 +234,19 @@ final class PlazaSceneTests: XCTestCase {
 
     // MARK: In their hands
 
+    func testSomeoneCanBeGivenSomethingElseToHoldOnThisPhone() throws {
+        let scene = PlazaScene(seed: 4)
+        var someone = person(1)
+        someone.profile.holding = Holding(kind: .game, title: "Hades", picture: "1145360")
+        let shared = Holding(kind: .artist, title: "Stromae", picture: nil)
+        scene.sync([someone, person(2)], held: [someone.id: shared])
+        XCTAssertEqual(scene.actors(time: 0).first { $0.id == someone.id }?.holding, shared)
+        XCTAssertNil(try XCTUnwrap(scene.actors(time: 0).first { $0.id != someone.id }).holding)
+        // Without it they go back to what they chose themselves.
+        scene.sync([someone, person(2)])
+        XCTAssertEqual(scene.actors(time: 0).first { $0.id == someone.id }?.holding, someone.profile.holding)
+    }
+
     func testPeopleAndYouCarryWhatTheyAreHolding() throws {
         let scene = PlazaScene(seed: 1)
         scene.me = look

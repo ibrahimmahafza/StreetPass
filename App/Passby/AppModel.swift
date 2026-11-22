@@ -11,6 +11,7 @@ final class AppModel {
             guard state != oldValue else { return }
             try? store.save(state)
             applySettings()
+            findWhatIsShared()
         }
     }
 
@@ -32,6 +33,19 @@ final class AppModel {
 
     /// Whether Bluetooth passing is working, for Settings.
     private(set) var passStatus = PassService.Status.off
+
+    /// Whether a Spotify login is being kept. While it is, the top artists are fetched again each
+    /// time the app is opened.
+    private(set) var spotifyLoggedIn = false
+    /// What each person holds on this phone when it is not what they chose themselves: the thing you
+    /// have in common with them. Worked out again whenever anything it depends on changes.
+    private(set) var held: [UUID: Holding] = [:]
+    @ObservationIgnored private var refreshingSpotify = false
+    @ObservationIgnored private var spotifyRefreshed = Date.distantPast
+    /// `-spotifydemo` shows the app as logged in to Spotify without a login, for screenshots.
+    @ObservationIgnored private let demoSpotify: Bool
+    /// Shared games whose cover has been asked for, so each is only looked up once.
+    @ObservationIgnored private var coversAsked: Set<String> = []
 
     /// Someone whose phone was detected moments ago.
     struct Meeting: Equatable {
@@ -85,9 +99,16 @@ final class AppModel {
         demoTurn = value("-turn").flatMap { Double($0) } ?? 0
         pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
         pendingDelay = value("-after").flatMap { Double($0) } ?? 0
+        demoSpotify = arguments.contains("-spotifydemo")
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }
         try? store.save(state)
+        // A login left behind by an earlier install, or by a reset, does not carry over to a fresh start.
+        if state.me == nil || arguments.contains("-reset") { SpotifyLink.logOut() }
+        #if DEBUG
+        if let token = value("-spotifytoken") { SpotifyLink.pretendLogin(token) }
+        #endif
+        spotifyLoggedIn = demoSpotify || SpotifyLink.isLoggedIn
         audio.muted = arguments.contains("-mute")
         audioCheck = arguments.contains("-audiocheck")
         let info = Bundle.main.infoDictionary
@@ -99,6 +120,7 @@ final class AppModel {
         finder.onFix = { [weak self] in self?.pointIsland() }
         applySettings()
         giveCardsToEarlierProfiles()
+        findWhatIsShared()
     }
 
     private func applySettings() {
@@ -114,8 +136,8 @@ final class AppModel {
         syncIsland()
     }
 
-    /// The green outline follows the number of people waiting, and during a meeting the island
-    /// names the person. With `announce` it opens up to say so.
+    /// The island shows nothing until someone is detected. During a meeting it names the person,
+    /// and with `announce` it opens up to say so.
     private func syncIsland(announce: LiveActivityController.Announce = .no) {
         // The island is hidden while the app is on screen, so direction is only sent to it otherwise.
         let meet = meeting.map {
@@ -123,9 +145,7 @@ final class AppModel {
                 name: $0.name, until: $0.until,
                 bearing: onScreen ? nil : finder.bearing, distance: onScreen ? nil : finder.distance)
         }
-        live.sync(
-            waiting: state.waiting.count, wanted: state.me != nil && state.passingOn, canStart: onScreen,
-            meeting: meet, announce: announce)
+        live.sync(wanted: state.me != nil && state.passingOn, canStart: onScreen, meeting: meet, announce: announce)
     }
 
     /// Turns the island's arrow as new directions arrive, at most once a second.
@@ -150,6 +170,7 @@ final class AppModel {
         audio.setForeground(active)
         if onScreen != active { note("app", active ? "app in front" : "app left the screen") }
         onScreen = active
+        if active { refreshSpotify() }
         if active, let meeting {
             if meeting.until <= Date() {
                 // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
@@ -179,6 +200,10 @@ final class AppModel {
             simulatePass()
             finder.demoSweep()
         }
+        if demo == "sweep" {
+            simulatePass()
+            finder.demoWaitingForSweep()
+        }
         guard passes > 0 else { return }
         Task {
             // Ask iOS to keep the app alive through the wait, so the pass can arrive with the app in the background.
@@ -201,6 +226,8 @@ final class AppModel {
         s.steamLinked = !profile.games.isEmpty
         s.artistCard = artistCard?.normalized()
         s.gameCard = gameCard?.normalized()
+        s.remember(s.artistCard)
+        s.remember(s.gameCard)
         state = s
         findGameCover()
     }
@@ -220,8 +247,88 @@ final class AppModel {
         }
         // What you just linked is what you hold. If you removed it, hold the other one if there is one.
         s.me?.holding = card?.normalized() ?? (kind == .spotify ? s.gameCard : s.artistCard)
+        s.remember(card?.normalized())
         state = s
         findGameCover()
+    }
+
+    // MARK: Spotify
+
+    /// Opens Spotify's login page. Afterwards the app stays logged in and the pictures that came
+    /// with the artists are kept. Gives the names and the card for the favourite.
+    func logInToSpotify() async throws -> (names: [String], card: Holding?) {
+        let artists = try await SpotifyLink.logIn()
+        spotifyLoggedIn = SpotifyLink.isLoggedIn
+        spotifyRefreshed = Date()
+        var s = state
+        s.remember(artists)
+        state = s
+        return (
+            artists.map(\.name),
+            artists.first.flatMap { Holding(kind: .artist, title: $0.name, picture: $0.picture).normalized() })
+    }
+
+    /// Forgets the Spotify login. The artists stay as they are and can be edited by hand again.
+    func logOutOfSpotify() {
+        SpotifyLink.logOut()
+        spotifyLoggedIn = false
+        note("links", "logged out of Spotify")
+    }
+
+    /// While logged in to Spotify, fetches the top artists again. Called each time the app comes to
+    /// the front; a minute has to pass between two fetches, so flicking in and out does not ask twice.
+    private func refreshSpotify() {
+        guard spotifyLoggedIn, !demoSpotify, state.me != nil, !refreshingSpotify,
+              Date().timeIntervalSince(spotifyRefreshed) > 60
+        else { return }
+        refreshingSpotify = true
+        Task { [weak self] in
+            let result: Result<[SpotifyReply.Artist], Error>
+            do { result = .success(try await SpotifyLink.refresh()) } catch { result = .failure(error) }
+            guard let self else { return }
+            self.refreshingSpotify = false
+            switch result {
+            case let .success(artists):
+                self.spotifyRefreshed = Date()
+                var s = self.state
+                s.setTopArtists(artists)
+                note("links", s == self.state ? "top artists are the same as last time" : "top artists updated")
+                self.state = s
+            case .failure(SpotifyLink.Failure.loggedOut):
+                // Spotify stopped accepting the login. The list stays; logging in again is in Settings.
+                self.spotifyLoggedIn = false
+                note("links", "the Spotify login ran out; log in again in Settings to keep the artists up to date")
+            case .failure:
+                // No signal, or Spotify having a bad moment. Try again the next time the app is opened.
+                break
+            }
+        }
+    }
+
+    // MARK: In common
+
+    /// Works out who holds something you share with them, and looks up the cover of any shared game
+    /// this phone has no picture for yet.
+    private func findWhatIsShared() {
+        var next: [UUID: Holding] = [:]
+        var missing: [String] = []
+        for encounter in state.encounters where !state.shared(with: encounter).isEmpty {
+            guard let holding = state.held(by: encounter) else { continue }
+            next[encounter.id] = holding
+            if holding.kind == .game, holding.picture == nil { missing.append(holding.title) }
+        }
+        if next != held { held = next }
+        for title in missing where !coversAsked.contains(Common.key(title)) {
+            coversAsked.insert(Common.key(title))
+            Task { [weak self] in
+                guard let app = await SteamLink.app(named: title), let self else { return }
+                var s = self.state
+                var book = s.pictures ?? PictureBook()
+                book.learn(.game, title, picture: app)
+                s.pictures = book
+                self.state = s
+            }
+        }
     }
 
     /// Puts a card in your character's hands, or takes it away.
@@ -238,6 +345,7 @@ final class AppModel {
             var s = self.state
             s.gameCard?.picture = app
             if s.me?.holding == card { s.me?.holding?.picture = app }
+            s.remember(s.gameCard)
             self.state = s
         }
     }
@@ -276,14 +384,22 @@ final class AppModel {
         }
     }
 
-    /// Why the island will not turn green outside the app, or nil when it will.
+    /// Why the island will not announce anyone outside the app, or nil when it will.
     var islandNote: String? {
-        live.allowed ? nil : "Live Activities are off for Passby in iOS Settings, so the island only turns green inside the app."
+        live.allowed ? nil : "Live Activities are off for Passby in iOS Settings, so the island can only announce people while the app is open."
     }
 
     /// Empties the plaza, for a clean start before a demo.
     func forgetEveryone() {
         state.forgetEveryone()
+    }
+
+    /// Takes one person out of the plaza. An announcement about them ends with it.
+    func forget(_ id: UUID) {
+        let name = state.encounters.first { $0.id == id }?.profile.name ?? "someone"
+        if meeting?.id == id { endMeeting() }
+        state.forget(id)
+        note("app", "forgot \(name)")
     }
 
     // MARK: Passing
@@ -387,6 +503,23 @@ final class AppModel {
         "Deep Rock Galactic": "548430", "Counter-Strike 2": "730", "Slay the Spire": "646570",
     ]
 
+    /// A Spotify picture for each demo artist, so demo people can hold a real cover: the cover of a
+    /// well-known album, or for one of them the artist's photo.
+    private static let demoCovers = [
+        "Daft Punk": "ab67616d00001e029b9b36b0e22870b9f542d937", "Stromae": "ab67616d00001e02ab580fab750cc9baf0d52b5c",
+        "Tyler, The Creator": "ab67616d00001e0230a635de2bb0caa4e26f6abb", "Frank Ocean": "ab67616d00001e02c5649add07ed3720be9d5526",
+        "Kaytranada": "ab676161000051749b9d4fdf5e4cf58e2fa93167", "Gorillaz": "ab67616d00001e02622aefd794f6fe4d8e714358",
+        "SZA": "ab67616d00001e02bc18bdade69ec5ef0bb25b17", "Tame Impala": "ab67616d00001e029e1cfc756886ac782e363d79",
+        "Dua Lipa": "ab67616d00001e02c88bae7846e62a8ba59ee0bd", "Radiohead": "ab67616d00001e02de3c04b5fc750b68899b20a9",
+        "Bad Bunny": "ab67616d00001e0249d694203245f241a1bcaa72", "Charli xcx": "ab67616d00001e02f88b43d15fd14e9525338b59",
+    ]
+
+    /// The demo "you": ten artists, as after a Spotify login. Only the first is one the demo people
+    /// listen to, and only the first game is one they play, so about half of them share something
+    /// with you and the rest hold what they chose themselves.
+    private static let demoTopTen = ["Stromae", "Angèle", "Sébastien Tellier", "Justice", "Phoenix", "L'Impératrice", "Air", "Polo & Pan", "M83", "Christine and the Queens"]
+    private static let demoTopGames = ["Hades", "Outer Wilds", "Disco Elysium"]
+
     private func demoProfile(named name: String) -> Profile {
         var profile = Profile(
             id: UUID(), name: name, look: .random(using: &rng),
@@ -394,13 +527,13 @@ final class AppModel {
             artists: Array(Self.demoArtists.shuffled(using: &rng).prefix(3)),
             games: Array(Self.demoGames.shuffled(using: &rng).prefix(3)),
             greeting: Self.demoGreetings.randomElement(using: &rng) ?? "Hi!")
-        // Most hold their game, with its real cover; some hold their artist, for whom there is no
-        // picture without a Spotify login; a few hold nothing.
+        // Most hold their game, with its real cover; some hold their artist, with an album cover as
+        // after a Spotify login; a few hold nothing.
         switch Int.random(in: 0..<10, using: &rng) {
         case 0..<6:
             profile.holding = profile.games.first.map { Holding(kind: .game, title: $0, picture: Self.demoApps[$0]) }
         case 6..<9:
-            profile.holding = profile.artists.first.map { Holding(kind: .artist, title: $0, picture: nil) }
+            profile.holding = profile.artists.first.map { Holding(kind: .artist, title: $0, picture: Self.demoCovers[$0]) }
         default:
             break
         }
@@ -415,12 +548,17 @@ final class AppModel {
         var s = PlazaState()
         s.me = Profile(
             id: UUID(), name: "You", look: Look(skin: 1, hair: 1, hairColor: 0, eyes: 0, mouth: 0, hoodie: 5, extra: 3),
-            instagram: "you", artists: ["Stromae", "Kaytranada", "SZA"], games: ["Hades", "Celeste", "Balatro"],
+            instagram: "you", artists: Self.demoTopTen, games: Self.demoTopGames,
             greeting: "Hi, I'm new here!")
-        s.artistCard = Holding(kind: .artist, title: "Stromae", picture: nil)
+        s.artistCard = Holding(kind: .artist, title: "Stromae", picture: Self.demoCovers["Stromae"])
         s.gameCard = Holding(kind: .game, title: "Hades", picture: Self.demoApps["Hades"])
         s.me?.holding = s.gameCard
         s.spotifyLinked = true
+        // The pictures a Spotify login would have left behind, and the covers of your own games.
+        var book = PictureBook()
+        for name in Self.demoTopTen { if let cover = Self.demoCovers[name] { book.learn(.artist, name, picture: cover) } }
+        for (game, app) in Self.demoApps where s.me?.games.contains(game) == true { book.learn(.game, game, picture: app) }
+        s.pictures = book
         let now = Date()
         for (i, name) in Self.demoNames.prefix(14).enumerated() {
             let p = demoProfile(named: name)
@@ -430,11 +568,15 @@ final class AppModel {
                 s.encounters[j].times = Int.random(in: 1...6, using: &rng)
             }
         }
-        if !["plaza", "gallery", "icon", "meet", "diagnostics"].contains(demo) {
+        if !["plaza", "gallery", "icon", "meet", "sweep", "diagnostics"].contains(demo) {
             var lina = demoProfile(named: "Lina")
             lina.look = Look(skin: 2, hair: 3, hairColor: 1, eyes: 0, mouth: 0, hoodie: 7, extra: 0)
             lina.instagram = "lina.mtl"
             lina.greeting = "Hey! I think we take the same bus."
+            // Lina shares two artists and a game with the demo "you", so her card shows what that looks like.
+            lina.artists = ["Angèle", "Stromae", "Kaytranada", "SZA", "Dua Lipa", "Charli xcx", "Gorillaz", "Tame Impala", "Tyler, The Creator", "Frank Ocean"]
+            lina.games = ["Stardew Valley", "Hades", "Hollow Knight"]
+            lina.holding = Holding(kind: .game, title: "Stardew Valley", picture: Self.demoApps["Stardew Valley"])
             var theo = demoProfile(named: "Theo")
             theo.look = Look(skin: 4, hair: 4, hairColor: 0, eyes: 2, mouth: 3, hoodie: 2, extra: 3)
             theo.instagram = "theo.wav"
