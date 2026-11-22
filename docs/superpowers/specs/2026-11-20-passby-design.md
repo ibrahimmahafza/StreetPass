@@ -475,3 +475,19 @@ public profile's ID planted as if logged in (`-steamid`, debug builds only), the
 when the app opens, the logged-in screen lists them and logging out returns to the entry
 screen. Not checked, because it needs a real Steam account: the sign-in itself, Steam handing
 back to `https://passby/steam`, and the confirmation of a genuine sign-in.
+
+## Connect or type, not both (2026-11-22, build 15)
+
+Achraf: "for the interest section, we either do hand filled boxes or auto-filled categories
+from the connectors, don't have both concurrently". The Spotify and Steam screens used to
+show the login and the three boxes together, and a Steam profile found by name was poured into
+the boxes to be edited. Now each screen is one of two things at a time:
+
+- Connecting: the login ("Log in with Spotify", or "Log in with Steam" plus naming a Steam
+  profile), and nothing to type the list into. What comes back is saved as it is.
+- By hand: the three boxes and "Save", and no logins.
+
+A small button under either switches to the other ("Type them instead", "Use Spotify instead").
+The screen starts on connecting when its key is present, on the boxes when the person had typed
+theirs before, and after logging out it is back on connecting. Without a key there is only the
+boxes. While logged in it is still the list and "Log out", as before.

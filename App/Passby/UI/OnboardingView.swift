@@ -79,19 +79,24 @@ struct OnboardingView: View {
         }
     }
 
-    /// The character on its lit disc. It gives way to the keyboard and to tall panels.
+    /// The character on its lit disc. It gives way to the keyboard and to tall panels, and when
+    /// there is too little room left to show it properly it is not shown at all.
     private var stage: some View {
-        ZStack(alignment: .bottom) {
-            Pedestal()
-                .frame(width: 196, height: 46)
-            CharacterView(look: look, animated: true)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.bottom, 17)
-                .scaleEffect(jumping ? 1.06 : 1, anchor: .bottom)
-                .animation(.spring(response: 0.25, dampingFraction: 0.42), value: jumping)
+        GeometryReader { room in
+            ZStack(alignment: .bottom) {
+                Pedestal()
+                    .frame(width: 196, height: 46)
+                CharacterView(look: look, animated: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.bottom, 17)
+                    .scaleEffect(jumping ? 1.06 : 1, anchor: .bottom)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.42), value: jumping)
+            }
+            .padding(.bottom, 18)
+            .padding(.horizontal, 20)
+            .frame(width: room.size.width, height: room.size.height)
+            .opacity(room.size.height < 96 ? 0 : 1)
         }
-        .padding(.bottom, 18)
-        .padding(.horizontal, 20)
         .frame(maxWidth: .infinity, minHeight: 0, maxHeight: welcomed ? 310 : 420)
         .clipped()
         // In the middle of whatever room the title above and the controls below leave.

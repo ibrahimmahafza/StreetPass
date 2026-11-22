@@ -1,10 +1,17 @@
 import PassbyCore
 import SwiftUI
 
-/// Sets your artists or your three games. Typing them always works; logins are offered when available.
-/// Logged in to Spotify, the artists are Spotify's own top ten and keep themselves up to date, so
-/// there is nothing to type and the screen shows the list and a way to log out. Logged in to
-/// Steam it is the same with your three most-played games.
+/// Sets your artists or your three games, one of two ways and never both at once.
+///
+/// Connecting: you log in to Spotify or Steam (or, for Steam, name a profile) and the list fills
+/// itself in. Nothing is typed and nothing is edited: what comes back is what is saved, and while
+/// you stay logged in it keeps itself up to date, so the screen is then the list and a way to
+/// log out.
+///
+/// By hand: three boxes to type in, and no logins on screen.
+///
+/// The screen starts on connecting when that is possible, on the boxes when you had typed some
+/// before, and a small button switches between the two.
 struct LinkEntry: View {
     @Environment(AppModel.self) private var model
 
@@ -22,8 +29,9 @@ struct LinkEntry: View {
     let onDone: ([String], Holding?) -> Void
 
     @State private var items = ["", "", ""]
-    /// The card a login found, with its picture.
-    @State private var found: Holding?
+    /// True while the boxes are showing, false while the logins are. Nil until the screen has
+    /// worked out which to start on.
+    @State private var byHand: Bool?
     @State private var steamProfile = ""
     @State private var busy = false
     @State private var note: String?
@@ -43,14 +51,11 @@ struct LinkEntry: View {
                     SteamSignIn { claim in
                         signingInToSteam = false
                         guard let claim else { return }
-                        fetch(
+                        connect(
                             "Steam didn't answer. Type them instead.",
                             hidden: "Steam is keeping this account's games private. In Steam, open Edit Profile, then Privacy, set Game details to Public and log in again. Or type them instead."
                         ) {
-                            // Steam's list is saved as it is, with nothing left to type.
-                            let got = try await model.logInToSteam(claim)
-                            onDone(got.names, got.card)
-                            return nil
+                            try await model.logInToSteam(claim)
                         }
                     }
                 }
@@ -76,7 +81,8 @@ struct LinkEntry: View {
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
             Button("Log out of \(kind.name)") {
                 if kind == .spotify { model.logOutOfSpotify() } else { model.logOutOfSteam() }
-                for (i, value) in initial.prefix(3).enumerated() { items[i] = value }
+                // Logged out, it is back to the choice, with the logins showing first.
+                byHand = false
             }
             .buttonStyle(PlainButtonStyleWhite())
         }
@@ -99,67 +105,71 @@ struct LinkEntry: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Whether there is anything to connect to. Without its key a login cannot work, and the
+    /// screen is just the boxes.
+    private var canConnect: Bool {
+        kind == .spotify ? Secrets.spotifyClientID != nil : Secrets.steamAPIKey != nil
+    }
+
     private var entry: some View {
         VStack(alignment: .leading, spacing: 8) {
-            login
-            if let note {
-                Text(note)
-                    .font(Theme.font(12.5))
-                    .foregroundStyle(Theme.soft)
+            if canConnect, byHand == false {
+                connecting
+            } else {
+                typing
             }
-            Text("Your top three \(kind.things)")
-                .font(Theme.font(14, .bold))
-                .foregroundStyle(Theme.soft)
-            ForEach(0..<3, id: \.self) { i in
-                TextField("\(kind.placeholder) \(i + 1)", text: $items[i])
-                    .fieldStyle()
-                    .submitLabel(i == 2 ? .done : .next)
-            }
-            Button("Save \(kind.things)") { onDone(cleaned, card) }
-                .buttonStyle(GoButtonStyle())
-                .disabled(cleaned.isEmpty)
-                .padding(.top, 2)
         }
         .onAppear {
             for (i, value) in initial.prefix(3).enumerated() { items[i] = value }
+            // Someone who typed theirs before comes back to the boxes; everyone else to the logins.
+            if byHand == nil { byHand = !initial.isEmpty }
         }
     }
 
-    /// What the character will hold. A login's pick stands as long as it still fits what is being saved:
-    /// the favourite artist has to still be first on the list, while the most recent game need not be
-    /// on the list at all. Otherwise it is the first name, without a picture.
-    private var card: Holding? {
-        guard let first = cleaned.first else { return nil }
-        if let found, kind == .steam || found.title == first { return found }
-        return Holding(kind: kind == .spotify ? .artist : .game, title: first, picture: nil)
+    /// The other way of doing it, as a small button under whichever way is showing.
+    private func switchButton(_ title: String, toHand: Bool) -> some View {
+        Button(title) {
+            note = nil
+            withAnimation(.snappy(duration: 0.25)) { byHand = toHand }
+        }
+        .font(Theme.font(13.5, .bold))
+        .foregroundStyle(Theme.link)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .disabled(busy)
     }
 
-    /// The real login, shown only when its key is present. Whatever it finds lands in the fields below.
+    /// Connecting: the logins and nothing to type into.
     @ViewBuilder
-    private var login: some View {
+    private var connecting: some View {
+        Text(kind == .spotify
+            ? "Log in and your top ten artists fill themselves in, and stay up to date."
+            : "Log in and your three most-played games fill themselves in, and stay up to date.")
+            .font(Theme.font(13.5))
+            .foregroundStyle(Theme.soft)
+            .fixedSize(horizontal: false, vertical: true)
         switch kind {
-        case .spotify where Secrets.spotifyClientID != nil:
+        case .spotify:
             Button(busy ? "Asking Spotify" : "Log in with Spotify") {
-                fetch("Spotify didn't answer. Type them instead.") {
-                    // Spotify's list is saved as it is: all ten, with nothing left to type.
-                    let got = try await model.logInToSpotify()
-                    onDone(got.names, got.card)
-                    return nil
-                }
+                connect("Spotify didn't answer. Type them instead.") { try await model.logInToSpotify() }
             }
-            .buttonStyle(PlainButtonStyleWhite())
+            .buttonStyle(GoButtonStyle())
             .disabled(busy)
-        case .steam where Secrets.steamAPIKey != nil:
+        case .steam:
             Button(busy ? "Asking Steam" : "Log in with Steam") { signingInToSteam = true }
-                .buttonStyle(PlainButtonStyleWhite())
+                .buttonStyle(GoButtonStyle())
                 .disabled(busy)
-            // Looking a profile up by its name still works, for anyone who would rather not log in.
+            // Naming a profile works without logging in. It fills in the same way, once.
+            Text("Or name a Steam profile")
+                .font(Theme.font(12.5, .bold))
+                .foregroundStyle(Theme.soft)
+                .padding(.top, 2)
             HStack(spacing: 8) {
                 TextField("Steam profile link or name", text: $steamProfile)
                     .textInputAutocapitalization(.never)
                     .fieldStyle()
                 Button(busy ? "Looking" : "Find") {
-                    fetch(nil) {
+                    connect(nil) {
                         let got = try await SteamLink.games(profile: steamProfile)
                         return (got.names, got.card)
                     }
@@ -168,23 +178,52 @@ struct LinkEntry: View {
                 .frame(width: 96)
                 .disabled(busy || steamProfile.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-        default:
-            EmptyView()
+        }
+        if let note {
+            Text(note)
+                .font(Theme.font(12.5))
+                .foregroundStyle(Theme.soft)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        switchButton("Type them instead", toHand: true)
+    }
+
+    /// By hand: three boxes and nothing to log in to.
+    @ViewBuilder
+    private var typing: some View {
+        Text("Your top three \(kind.things)")
+            .font(Theme.font(14, .bold))
+            .foregroundStyle(Theme.soft)
+        ForEach(0..<3, id: \.self) { i in
+            TextField("\(kind.placeholder) \(i + 1)", text: $items[i])
+                .fieldStyle()
+                .submitLabel(i == 2 ? .done : .next)
+        }
+        Button("Save \(kind.things)") {
+            // Typed by hand, the first one is what the character holds, as a plain card.
+            onDone(cleaned, cleaned.first.map { Holding(kind: kind == .spotify ? .artist : .game, title: $0, picture: nil) })
+        }
+        .buttonStyle(GoButtonStyle())
+        .disabled(cleaned.isEmpty)
+        .padding(.top, 2)
+        if canConnect {
+            switchButton("Use \(kind.name) instead", toHand: false)
         }
     }
 
-    /// Runs a login. What it gives back goes into the fields to be looked over; nil means it has
-    /// already been saved.
-    private func fetch(_ fallback: String?, hidden: String = "That Steam profile is private. Type them instead.", _ work: @escaping () async throws -> ([String], Holding?)?) {
+    /// Connects: runs a login or a lookup and saves what it gives, as it is.
+    private func connect(
+        _ fallback: String?, hidden: String = "That Steam profile is private. Type them instead.",
+        _ work: @escaping () async throws -> ([String], Holding?)
+    ) {
         busy = true
         note = nil
         Task {
             do {
-                if let (names, card) = try await work() {
-                    for i in 0..<3 { items[i] = i < names.count ? names[i] : "" }
-                    found = card
-                    note = "Found them. Change anything you like, then save."
-                }
+                let (names, card) = try await work()
+                busy = false
+                onDone(names, card)
+                return
             } catch SteamLink.Failure.isPrivate {
                 note = hidden
             } catch SteamLink.Failure.notConfirmed {

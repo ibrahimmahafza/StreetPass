@@ -119,7 +119,9 @@ Settings, "Forget everyone" on both before going on, or they will not pass again
 
 ## Spotify and Steam logins (optional)
 
-Without keys, people type their three artists and three games. To enable the logins,
+Each link screen is either a login that fills the list in by itself or three boxes to type
+in, never both at once; a small button switches. Without keys there are only the boxes. To
+enable the logins,
 copy `App/Secrets.example.plist` to `App/Passby/Resources/Secrets.plist` and fill in:
 
 - `SpotifyClientID`: from an app in the Spotify developer dashboard, with the redirect
