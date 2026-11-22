@@ -10,7 +10,9 @@ app; nothing here comes from the games that inspired it.
 
 ## What is in it
 
-- Onboarding in four steps: name, character, Instagram, Spotify or Steam.
+- Onboarding with the feel of a 2000s console's setup menu: a welcome, then name, character
+  (tabs and tiles), Instagram, Spotify or Steam. Settings > "Start over from the welcome"
+  shows it again for a demo.
 - A full-screen 3D checkerboard plaza. Your own character stands in the middle and everyone
   you have passed walks around you.
 - Three round buttons at the top: your character, people you passed, settings.
@@ -35,12 +37,15 @@ app; nothing here comes from the games that inspired it.
   A Live Activity still runs the whole time, because iOS will not let an app start one from
   the background, but between meetings it draws nothing on the island and is one small line
   on the Lock Screen.
-- When two phones detect each other, "Time to make a new friend" comes up. Inside the app it
-  is a panel that opens out of the island for 15 seconds, with an arrow that turns towards
-  the other person on phones that can tell. With the app in the background the island keeps
-  the meeting for two minutes and the big island is brought back every five seconds for the
-  first half minute (iOS closes it by itself and an app cannot hold it open). Opening the app
-  during those two minutes shows the panel and the arrow again.
+- When two phones detect each other, "Time to make a new friend" comes up and asks: "Skip"
+  or "Meet". Nothing counts down. With the app out of sight the question is on the real
+  Dynamic Island (and the Lock Screen): "Skip" closes it without opening the app, "Meet"
+  opens the app. The big island is brought back every five seconds for the first half minute
+  (iOS closes it by itself and an app cannot hold it open). Inside the app, where iOS hides
+  an app's own island, the app draws the same big island in the same place, opening out of
+  the real one, with its green edge pulsing while it asks. After "Meet" it points the way,
+  with an arrow that turns towards the other person on phones that can tell, until "Done".
+  Left unanswered, the question ends by itself after two minutes.
 - Synthesised sounds, a babble voice and a looping background tune.
 
 iPhone only, iOS 17 or later. No server and no accounts.
@@ -105,8 +110,8 @@ The arrow comes from the Ultra Wideband chip (Apple's Nearby Interaction), not f
 Bluetooth, which cannot tell direction. It needs the app open on both phones, and the
 first time it asks for permission to find nearby devices, and on some iPhones for the
 camera, which it uses to work out direction. Do one pass before the demo to get those
-prompts out of the way. Without a direction the popup still appears, with the distance
-or just "close by".
+prompts out of the way. Without a direction the announcement still appears, with the
+distance or just "close by".
 
 Two phones that stay near each other count as one pass. Someone counts again only
 after ten minutes out of range. If you rehearsed with the same phones, press
@@ -148,8 +153,17 @@ docs/           the design, the plan and the approved mockup
 ```
 
 The characters are 3D models built in code: a smooth egg-shaped head with a pencil-sketched
-face, on a body that is one continuous surface. The head, hair and face are in
+face, on a body that is one continuous surface. The head and face are in
 `App/Passby/Draw/Character3D.swift`; the body's shape is in `App/Passby/Draw/BodyMesh.swift`.
+Each haircut is one sculpted, glossy shape described by a few numbers in
+`App/Passby/Draw/HairMesh.swift`; `tools/sim.sh hair` shows all eight from three sides.
+
+`tools/film.py out.mp4 --name ... --look ... --artists ...` records a twelve-second clip for a
+demo: a quiet plaza with no controls on screen, one person appears, walks to the front and
+says hello, and their card comes up. It runs the app's film mode (`-demo film`) in a simulator,
+adds the app's own sounds and tune, and needs ffmpeg. `--seed` repeats a take that came out well.
+`--wide` makes it landscape, 1920 by 1080: the app turns on its side for the film, the card
+becomes a panel beside the person, and the view starts wide and closes in further.
 To change the tune, edit `tools/make_music.py` and run it.
 
 Tests: `swift test --package-path PassbyCore`

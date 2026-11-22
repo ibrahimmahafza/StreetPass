@@ -5,13 +5,27 @@ import SwiftUI
 /// at the top and a bar of numbers sits along the bottom. Drag, pinch and twist to move the view.
 struct PlazaView: View {
     @Environment(AppModel.self) private var model
-    @State private var scene = PlazaScene()
+    /// `-filmseed <n>` makes the crowd start out and wander the same way each time, so a film that
+    /// came out well can be made again.
+    private static let seed: UInt64? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.firstIndex(of: "-filmseed").flatMap { arguments.indices.contains($0 + 1) ? UInt64(arguments[$0 + 1]) : nil }
+    }()
+    @State private var scene = PlazaScene(seed: PlazaView.seed)
+    /// How much of each side of a screen on its side a 16:9 clip leaves out, in points.
+    private static var sideCutFromAWideClip: CGFloat {
+        let screen = UIScreen.main.bounds.size
+        let wide = max(screen.width, screen.height), tall = min(screen.width, screen.height)
+        return max(0, (wide - tall * 16 / 9) / 2)
+    }
     @State private var sheet: Sheet?
     /// People still to greet in the arrival that is under way. The first is the one talking.
     @State private var queue: [UUID] = []
     @State private var arriving = false
     /// True when the open card was reached from the people list, so its button goes back there.
     @State private var fromList = false
+    /// In a film, the zoom the view is easing towards.
+    @State private var filmZoom: Double?
 
     private var waiting: [Encounter] { model.state.waiting }
 
@@ -19,38 +33,80 @@ struct PlazaView: View {
         GeometryReader { geo in
             ZStack {
                 floor
-                controls
+                if !model.filming { controls }
                 if let sheet {
                     Color(hex: 0xECF4F7).opacity(0.14)
                         .ignoresSafeArea()
                         .onTapGesture { dismiss() }
                         .transition(.opacity)
-                    panel(sheet)
-                        .frame(maxHeight: geo.size.height - 76, alignment: .bottom)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if let meeting = model.meeting, let until = model.popupUntil, until > Date() {
-                    IslandPopup(
-                        meeting: meeting, until: until, bearing: model.finder.bearing, distance: model.finder.distance,
-                        need: model.finder.need, safeTop: geo.safeAreaInsets.top
-                    ) {
-                        // Tapping the announcement goes straight to meeting them.
-                        if sheet == nil { meet() }
+                    if model.filming, model.filmWide {
+                        // On its side, the card is a panel in the bottom right, clear of whoever is
+                        // talking, and inside the middle of the picture that a 16:9 clip keeps.
+                        panel(sheet)
+                            .frame(width: 330)
+                            .scaleEffect(0.86, anchor: .bottomTrailing)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            // Measured on the whole screen, not the part inside its safe edges: the
+                            // clip keeps the middle 16:9 of the whole screen, and the card sits a
+                            // clear margin inside that.
+                            .padding(.trailing, Self.sideCutFromAWideClip + 30)
+                            .padding(.bottom, 26)
+                            .ignoresSafeArea()
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else {
+                        panel(sheet)
+                            .frame(maxHeight: geo.size.height - 76, alignment: .bottom)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .ignoresSafeArea()
-                    .transition(.scale(scale: 0.3, anchor: .top).combined(with: .opacity))
-                    .zIndex(10)
                 }
+                // Always there: with nobody to announce it is the island at rest, which cannot be seen.
+                IslandPopup(
+                    meeting: model.meeting, bearing: model.finder.bearing, distance: model.finder.distance,
+                    need: model.finder.need, safeTop: geo.safeAreaInsets.top,
+                    onSkip: {
+                        model.audio.blip()
+                        model.skipMeeting()
+                    },
+                    onMeet: {
+                        model.audio.blip()
+                        model.acceptMeeting()
+                    },
+                    onDone: {
+                        model.audio.blip()
+                        model.endMeeting()
+                    },
+                    // Tapping the person while the phone points at them opens their card.
+                    onOpen: { if sheet == nil { meet() } }
+                )
+                .frame(maxHeight: .infinity, alignment: .top)
+                .ignoresSafeArea()
+                .zIndex(10)
             }
-            .animation(.spring(duration: 0.45), value: model.popupUntil)
+            // The real island covers the clock and the battery when it opens. The panel cannot draw
+            // over them, so they step aside for it instead.
+            .statusBarHidden(model.filming || (model.meeting != nil && geo.safeAreaInsets.top >= 51))
+            // In a film the bar along the bottom of the screen goes too.
+            .persistentSystemOverlays(model.filming ? .hidden : .automatic)
         }
         .onAppear {
-            scene.me = model.state.me?.look
+            // In a film nobody of yours stands in the middle; the plaza belongs to whoever walks in.
+            scene.me = model.filming ? nil : model.state.me?.look
+            if model.filming {
+                // Whoever walks in comes right to the front, and the others leave them the floor.
+                // On its side they stand a little left of the middle, leaving the right for the card.
+                scene.soloGreetHeight = model.filmWide ? 0.46 : 0.45
+                scene.soloGreetAcross = model.filmWide ? 0.471 : 0.5
+                scene.givesArrivalsRoom = true
+                // The close view at the end takes in a good way round them; keep all of it clear.
+                if model.filmWide { scene.arrivalRoom = 7.5 }
+            }
             scene.myHolding = model.state.me?.holding
             scene.sync(model.state.encounters, held: model.held)
             openDemoScreen()
+        }
+        .task {
+            if model.filming { await film() }
         }
         .onChange(of: model.state.encounters) { _, encounters in
             scene.sync(encounters, held: model.held)
@@ -70,7 +126,12 @@ struct PlazaView: View {
     // MARK: Layers
 
     private var floor: some View {
-        PlazaBackdrop(scene: scene, startZoom: model.demoZoom, startTurn: model.demoTurn) { id in tapped(id) }
+        PlazaBackdrop(
+            scene: scene, startZoom: model.demoZoom, startTurn: model.demoTurn,
+            // On its side the picture starts further up the floor, on the crowd and the ring.
+            startLook: model.filming && model.filmWide ? 0.64 : 0.5,
+            glideTo: filmZoom, glideRate: model.filmWide ? 0.6 : 1.5
+        ) { id in tapped(id) }
             .ignoresSafeArea()
     }
 
@@ -120,9 +181,11 @@ struct PlazaView: View {
                 CardSheet(
                     encounter: encounter,
                     shared: model.state.shared(with: encounter),
+                    pictures: model.state.pictures ?? PictureBook(),
                     title: arriving ? (encounter.times <= 1 ? "New person" : "You passed again") : "Someone you passed",
                     buttonTitle: arriving ? (more ? "Next person" : "Done") : (fromList ? "Back to the list" : "Close"),
                     primary: more,
+                    bare: model.filming,
                     onButton: { fromList && !arriving ? open(.people) : dismiss() },
                     onClose: dismiss,
                     onForget: { forget(id) },
@@ -196,6 +259,23 @@ struct PlazaView: View {
 
     private func meet() {
         beginArrival(instantly: false)
+    }
+
+    /// The film: a quiet plaza, then one person appears, walks up and says hello. The card stays up
+    /// to the end. Times are in seconds from the start; tools/film.py cuts the clip to match.
+    private func film() async {
+        // Turning the screen on its side takes the system a few seconds; start once it is done.
+        if model.filmWide { try? await Task.sleep(for: .seconds(4)) }
+        model.filmBegins()
+        // Long enough for the bar along the bottom of the screen to have gone before the clip starts.
+        try? await Task.sleep(for: .seconds(2.9))
+        model.filmStarAppears()
+        try? await Task.sleep(for: .seconds(1.5))
+        meet()
+        // The view closes in on them as they walk up: further, and more slowly, when the picture is wide.
+        filmZoom = model.filmWide ? 4.0 : 1.7
+        try? await Task.sleep(for: .seconds(9.6))
+        model.filmEnds()
     }
 
     private func beginArrival(instantly: Bool) {

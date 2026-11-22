@@ -110,13 +110,24 @@ final class PlazaStage {
             figures[id] = nil
         }
         let scale = Float(PlazaScene.characterHeight / 100)
+        // Someone who turns up after the plaza has filled pops into place rather than just being there.
+        let latecomers = !figures.isEmpty
         for actor in actors {
             var figure = figures[actor.id]
             // A different look, or starting or stopping holding something, means a new model.
             if figure == nil || figure?.look != actor.look || (figure?.holding == nil) != (actor.holding == nil) {
+                let new = figure == nil && latecomers
                 figure?.node.removeFromParentNode()
                 let node = Character3D.make(actor.look, holding: actor.holding != nil)
                 node.scale = SCNVector3(scale, scale, scale)
+                if new {
+                    node.scale = SCNVector3(scale * 0.05, scale * 0.05, scale * 0.05)
+                    let grow = SCNAction.scale(to: CGFloat(scale * 1.12), duration: 0.2)
+                    grow.timingMode = .easeOut
+                    let settle = SCNAction.scale(to: CGFloat(scale), duration: 0.14)
+                    settle.timingMode = .easeInEaseOut
+                    node.runAction(.sequence([grow, settle]))
+                }
                 node.addChildNode(Stage.shadow(radius: 15))
                 people.addChildNode(node)
                 figure = Figure(node: node, look: actor.look)
@@ -170,11 +181,19 @@ struct PlazaStageView: UIViewRepresentable {
     var startZoom = 1.0
     /// Degrees the floor starts turned clockwise.
     var startTurn = 0.0
+    /// For a film: how far up the plain view (0 bottom, 1 top) the middle of the picture starts.
+    /// Half way, the default, is where it always is otherwise.
+    var startLook = 0.5
+    /// A zoom for the view to ease towards by itself, for a film, bringing the middle of the
+    /// picture back to half way as it goes. Nil leaves the view alone.
+    var glideTo: Double?
+    /// How quickly it gets there: the share of the remaining way covered each second, roughly.
+    var glideRate = 1.5
     /// Called with the person under a tap, or nil for empty floor.
     var onTap: ((UUID?) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(scene: scene, zoom: startZoom, turn: startTurn * .pi / 180)
+        Coordinator(scene: scene, zoom: startZoom, turn: startTurn * .pi / 180, look: startLook)
     }
 
     func makeUIView(context: Context) -> SCNView {
@@ -203,6 +222,8 @@ struct PlazaStageView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.onTap = onTap
+        context.coordinator.glide = glideTo
+        context.coordinator.glideRate = glideRate
     }
 
     static func dismantleUIView(_ view: SCNView, coordinator: Coordinator) {
@@ -216,6 +237,9 @@ struct PlazaStageView: UIViewRepresentable {
         let scene: PlazaScene
         let stage = PlazaStage()
         var onTap: ((UUID?) -> Void)?
+        /// A zoom to ease towards, a little each frame. Nil when the view is left to the fingers.
+        var glide: Double?
+        var glideRate = 1.5
         private weak var view: SCNView?
         private var link: CADisplayLink?
         private var last: CFTimeInterval?
@@ -225,6 +249,9 @@ struct PlazaStageView: UIViewRepresentable {
         private var turn: Double
         /// How far the middle of the screen has been slid from the centre of the floor, where you stand.
         private var slide = (x: 0.0, z: 0.0)
+        /// In a film, how far up the plain view the middle of the picture is. Nil outside films,
+        /// where the fingers decide.
+        private var look: Double?
 
         /// What is on screen right now: the simulation's camera, zoomed, slid and turned.
         private var lens: PlazaCamera {
@@ -233,10 +260,11 @@ struct PlazaStageView: UIViewRepresentable {
                 .turned(by: turn, about: (x: home.x + slide.x, z: home.z + slide.z))
         }
 
-        init(scene: PlazaScene, zoom: Double, turn: Double) {
+        init(scene: PlazaScene, zoom: Double, turn: Double, look: Double = 0.5) {
             self.scene = scene
             self.zoom = min(Self.zoomRange.upperBound, max(Self.zoomRange.lowerBound, zoom))
             self.turn = turn
+            self.look = look == 0.5 ? nil : look
         }
 
         func start(in view: SCNView) {
@@ -260,12 +288,21 @@ struct PlazaStageView: UIViewRepresentable {
                 // People are always placed through the plain camera, so moving the view never moves them.
                 scene.camera = PlazaCamera(aspect: now)
             }
+            let dt = min(0.05, link.timestamp - (last ?? link.timestamp))
+            last = link.timestamp
+            if let glide {
+                // Most of the way there in the first second, then settling: an eased push-in.
+                let step = 1 - exp(-dt * glideRate)
+                zoom += (glide - zoom) * step
+                if let now = look { look = now + (0.5 - now) * step }
+            }
+            if let look, let middle = scene.camera.ground(u: 0.5, v: 0.5), let there = scene.camera.ground(u: 0.5, v: look) {
+                slide = (0, there.z - middle.z)
+            }
             let lens = lens
             stage.use(lens)
             // People standing about face wherever the view is looking from.
             scene.viewer = Spot(x: lens.x, z: lens.z)
-            let dt = min(0.05, link.timestamp - (last ?? link.timestamp))
-            last = link.timestamp
             scene.step(dt)
             stage.show(scene.actors(time: link.timestamp), ring: scene.ring(), time: link.timestamp)
         }
@@ -339,10 +376,16 @@ struct PlazaBackdrop: View {
     let scene: PlazaScene
     var startZoom = 1.0
     var startTurn = 0.0
+    /// For a film: where the picture starts looking, the zoom it eases towards, and how quickly.
+    var startLook = 0.5
+    var glideTo: Double?
+    var glideRate = 1.5
     var onTap: ((UUID?) -> Void)?
 
     var body: some View {
-        PlazaStageView(scene: scene, startZoom: startZoom, startTurn: startTurn, onTap: onTap)
+        PlazaStageView(
+            scene: scene, startZoom: startZoom, startTurn: startTurn, startLook: startLook,
+            glideTo: glideTo, glideRate: glideRate, onTap: onTap)
             .accessibilityHidden(true)
     }
 }

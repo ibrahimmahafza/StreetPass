@@ -7,6 +7,7 @@ struct SettingsSheet: View {
 
     @State private var editing: LinkEntry.Kind?
     @State private var confirmingForget = false
+    @State private var confirmingStartOver = false
     @State private var showingLog = false
 
     var body: some View {
@@ -78,6 +79,17 @@ struct SettingsSheet: View {
                 Text("Simulate a pass is for demos and the simulator, where Bluetooth is unavailable. Forget everyone empties the plaza so the same phones can pass again.")
                     .font(Theme.font(12.5))
                     .foregroundStyle(Theme.soft)
+                Button("Start over from the welcome") { confirmingStartOver = true }
+                    .buttonStyle(PlainButtonStyleWhite())
+                    .confirmationDialog(
+                        "Start over? Your character, your links and everyone you passed are removed, and Passby opens at the welcome again.",
+                        isPresented: $confirmingStartOver, titleVisibility: .visible
+                    ) {
+                        Button("Start over", role: .destructive) {
+                            onClose()
+                            model.startOver()
+                        }
+                    }
                 Button("Diagnostics") { showingLog = true }
                     .font(Theme.font(13.5, .bold))
                     .foregroundStyle(Theme.link)

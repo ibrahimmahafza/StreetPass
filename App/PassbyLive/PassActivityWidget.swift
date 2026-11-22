@@ -1,32 +1,41 @@
 import ActivityKit
+import AppIntents
 import SwiftUI
 import WidgetKit
 
 /// The Live Activity. Most of the time it draws nothing on the Dynamic Island. It is only kept
 /// running because iOS will not let an app start one from the background, and a pass can arrive
 /// with the phone in a pocket. For a couple of minutes after someone is detected it says
-/// "Time to make a new friend" and shows where they are: an arrow when the phone can tell the
-/// direction, otherwise how far away they are.
+/// "Time to make a new friend" and asks, with two buttons on the big island: "Skip" closes it,
+/// "Meet" opens the app, which then points the way. The edge of the island is green meanwhile.
 struct PassActivityWidget: Widget {
-    private static let green = Color(red: 0.184, green: 0.89, blue: 0.42)
+    private static let green = ChoiceLabel.green
     /// What the Lock Screen row and a long press on the island say between meetings.
     private static let quietLine = "People you pass show up here"
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PassActivityAttributes.self) { context in
             if let meeting = Self.meeting(context) {
-                HStack(spacing: 12) {
-                    Self.pointer(context.state, size: 26)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(PassActivityAttributes.meetingTitle)
-                            .font(.system(.body, design: .rounded).weight(.semibold))
-                        Text(Self.detail(meeting, context.state))
-                            .font(.system(.footnote, design: .rounded))
-                            .foregroundStyle(.secondary)
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Self.pointer(context.state, size: 26)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(PassActivityAttributes.meetingTitle)
+                                .font(.system(.body, design: .rounded).weight(.semibold))
+                            Text(Self.detail(meeting, context.state))
+                                .font(.system(.footnote, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    if context.state.asking == true {
+                        Self.choices
+                    }
                 }
                 .padding(16)
+                .activityBackgroundTint(.black)
+                .activitySystemActionForegroundColor(.white)
+                .foregroundStyle(.white)
             } else {
                 // iOS gives every Live Activity a row on the Lock Screen, so between meetings it is one small line.
                 Text(Self.quietLine)
@@ -66,6 +75,11 @@ struct PassActivityWidget: Widget {
                             .padding(.vertical, 6)
                     }
                 }
+                DynamicIslandExpandedRegion(.bottom) {
+                    if meeting != nil, context.state.asking == true {
+                        Self.choices.padding(.top, 4)
+                    }
+                }
             } compactLeading: {
                 if meeting != nil {
                     Circle().fill(Self.green).frame(width: 10, height: 10).padding(.leading, 3)
@@ -87,6 +101,19 @@ struct PassActivityWidget: Widget {
                 .contentMargins(.all, 0, for: .compactLeading)
                 .contentMargins(.all, 0, for: .compactTrailing)
                 .contentMargins(.all, 0, for: .minimal)
+        }
+    }
+
+    /// The two answers. "Skip" is carried out inside the app without opening it; "Meet" opens the app.
+    private static var choices: some View {
+        HStack(spacing: 10) {
+            Button(intent: SkipMeetingIntent()) {
+                ChoiceLabel(text: PassActivityAttributes.skipTitle)
+            }
+            .buttonStyle(.plain)
+            Link(destination: PassActivityAttributes.meetLink) {
+                ChoiceLabel(text: PassActivityAttributes.meetTitle, yes: true)
+            }
         }
     }
 

@@ -6,9 +6,13 @@ struct CardSheet: View {
     let encounter: Encounter
     /// What you and they both list, best first. Their character is holding the first.
     var shared: [Common.Shared] = []
+    /// The pictures this phone knows for artists and games, for the list of what you share.
+    var pictures = PictureBook()
     let title: String
     let buttonTitle: String
     var primary = false
+    /// True leaves out every button, for a film: just the person and what they are into.
+    var bare = false
     let onButton: () -> Void
     let onClose: () -> Void
     /// Called once the person has confirmed they want this person out of their plaza.
@@ -18,11 +22,13 @@ struct CardSheet: View {
 
     @State private var shown = 0
     @State private var confirmingForget = false
+    /// Whether "You both like…" is open, showing the list.
+    @State private var showingShared = false
 
     private var profile: Profile { encounter.profile }
 
     var body: some View {
-        BottomSheet(title: title, onClose: onClose) {
+        BottomSheet(title: title, closes: !bare, onClose: onClose) {
             HStack(spacing: 13) {
                 CharacterView(look: profile.look)
                     .frame(width: 84, height: 96)
@@ -60,24 +66,19 @@ struct CardSheet: View {
                     .accessibilityLabel(profile.greeting)
             }
             if !shared.isEmpty {
-                HStack(spacing: 7) {
-                    Circle().fill(Theme.green).frame(width: 8, height: 8)
-                    Text(sharedLine)
-                        .font(Theme.font(14.5, .bold))
-                        .foregroundStyle(Theme.greenDark)
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
+                BothLike(shared: shared, pictures: pictures, open: $showingShared, onToggle: { onLetter(" ") })
             }
             if !profile.artists.isEmpty { list("Listens to", profile.artists, .artist) }
             if !profile.games.isEmpty { list("Plays", profile.games, .game) }
-            if primary {
+            if bare {
+                EmptyView()
+            } else if primary {
                 Button(buttonTitle, action: onButton).buttonStyle(GoButtonStyle())
             } else {
                 Button(buttonTitle, action: onButton).buttonStyle(PlainButtonStyleWhite())
             }
-            Button("Forget \(profile.name)") { confirmingForget = true }
+            if !bare {
+                Button("Forget \(profile.name)") { confirmingForget = true }
                 .font(Theme.font(13.5, .bold))
                 .foregroundStyle(Theme.soft)
                 .frame(maxWidth: .infinity)
@@ -88,6 +89,7 @@ struct CardSheet: View {
                 ) {
                     Button("Forget \(profile.name)", role: .destructive, action: onForget)
                 }
+            }
         }
         .task(id: encounter.id) {
             shown = 0
@@ -98,16 +100,6 @@ struct CardSheet: View {
                 shown += 1
                 onLetter(letter)
             }
-        }
-    }
-
-    /// "You both like Stromae", "... Stromae and Hades", "... Stromae, Hades and 2 more".
-    private var sharedLine: String {
-        let names = shared.map(\.title)
-        switch names.count {
-        case 1: return "You both like \(names[0])"
-        case 2: return "You both like \(names[0]) and \(names[1])"
-        default: return "You both like \(names[0]), \(names[1]) and \(names.count - 2) more"
         }
     }
 
@@ -135,6 +127,103 @@ struct CardSheet: View {
         .padding(.vertical, 9)
         .padding(.horizontal, 13)
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
+    }
+}
+
+/// "You both like…": the things you and this person have in common. Closed, it is one green row
+/// saying how many there are. Open, it lists them, each with its cover when this phone has one.
+private struct BothLike: View {
+    let shared: [Common.Shared]
+    let pictures: PictureBook
+    @Binding var open: Bool
+    var onToggle: () -> Void = {}
+
+    /// More than this many and the list scrolls, so a long one cannot push the card off the screen.
+    private static let rowsInView = 4.5
+    private static let rowHeight: CGFloat = 38
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                onToggle()
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) { open.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Circle().fill(Theme.green).frame(width: 8, height: 8)
+                    Text("You both like…")
+                        .font(Theme.font(14.5, .bold))
+                        .foregroundStyle(Theme.greenDark)
+                    Text("\(shared.count)")
+                        .font(Theme.font(12, .heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .frame(minWidth: 20, minHeight: 20)
+                        .background(Theme.green, in: Capsule())
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.greenDark)
+                        .rotationEffect(.degrees(open ? 180 : 0))
+                }
+                .padding(.horizontal, 13)
+                .frame(height: 42)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("You both like, \(shared.count) \(shared.count == 1 ? "thing" : "things")")
+            .accessibilityValue(open ? "open" : "closed")
+            .accessibilityHint(open ? "Closes the list" : "Shows the list")
+            if open {
+                let rows = VStack(spacing: 0) {
+                    ForEach(Array(shared.enumerated()), id: \.offset) { _, thing in
+                        row(thing)
+                    }
+                }
+                Group {
+                    if Double(shared.count) > Self.rowsInView {
+                        ScrollView { rows }
+                            .frame(height: Self.rowHeight * Self.rowsInView)
+                    } else {
+                        rows
+                    }
+                }
+                .padding(.horizontal, 13)
+                .padding(.bottom, 6)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(Theme.green.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.green.opacity(0.45), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func row(_ thing: Common.Shared) -> some View {
+        HStack(spacing: 10) {
+            cover(thing)
+                .frame(width: 28, height: 28)
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            Text(thing.title)
+                .font(Theme.font(14.5, .bold))
+                .foregroundStyle(Theme.greenDark)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            Text(thing.kind == .artist ? "Artist" : "Game")
+                .font(Theme.font(12))
+                .foregroundStyle(Theme.soft)
+        }
+        .frame(height: Self.rowHeight)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The cover this phone has for it. Until it has been fetched, or when there is none, that is
+    /// the plain card with a music note or a game pad that characters hold up too.
+    private func cover(_ thing: Common.Shared) -> some View {
+        // Reading the version redraws the row once a picture has arrived.
+        let _ = HoldingArt.shared.version
+        let holding = Holding(kind: thing.kind, title: thing.title, picture: pictures.picture(thing.kind, thing.title))
+        return Image(uiImage: HoldingArt.shared.card(for: holding))
+            .resizable()
+            .scaledToFill()
     }
 }
 

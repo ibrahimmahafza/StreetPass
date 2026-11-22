@@ -17,8 +17,17 @@ final class AppModel {
 
     /// Screen requested with `-demo <name>`, for screenshots and demos.
     let demo: String?
+    /// `-demo film`: no controls on screen, and one person walks in and introduces themselves.
+    /// Made for recording a clip of the plaza; see tools/film.py.
+    var filming: Bool { demo == "film" }
+    /// `-filmwide`: the film is shot with the phone on its side.
+    let filmWide: Bool
+    /// The person the film is about, described by the `-film...` launch arguments.
+    @ObservationIgnored private var filmStar: Profile?
     /// Onboarding step requested with `-step <0...3>`.
     let demoStep: Int
+    /// Whether a step was asked for at all. Without one, the first-run screens start at the welcome.
+    let demoStepGiven: Bool
     /// Link screen requested with `-link spotify` or `-link steam`.
     let demoLink: String?
     /// How far the plaza starts zoomed in, requested with `-zoom <1...3>`.
@@ -47,25 +56,11 @@ final class AppModel {
     /// Shared games whose cover has been asked for, so each is only looked up once.
     @ObservationIgnored private var coversAsked: Set<String> = []
 
-    /// Someone whose phone was detected moments ago.
-    struct Meeting: Equatable {
-        let id: UUID
-        let name: String
-        let look: Look
-        /// When the island stops pointing at them.
-        let until: Date
-    }
-
-    /// Set for two minutes after a pass, while the island says "Time to make a new friend" and the
-    /// phone keeps working out where the person is.
+    /// Someone whose phone was detected moments ago. The island, and inside the app the panel that
+    /// stands in for it, say "Time to make a new friend" and ask: "Skip" or "Meet". After "Meet"
+    /// the phone points the way. Nothing counts down; it only ends by itself after two minutes,
+    /// when they will have walked on.
     private(set) var meeting: Meeting?
-    /// While this is in the future the announcement is also up inside the app. It runs for 15 seconds
-    /// from the pass, and again from whenever the app is opened while the meeting is still on.
-    private(set) var popupUntil: Date?
-    /// How long the island keeps the meeting. Outside the app there is time to get the phone out.
-    static let meetingLength: TimeInterval = 120
-    /// How long the announcement stays up inside the app.
-    static let popupLength: TimeInterval = 15
     /// iOS closes the big island by itself a few seconds after an announcement and an app cannot hold
     /// it open. With the app in the background the announcement is therefore repeated, silently,
     /// this many times this far apart, which keeps the big island coming back for about half a minute.
@@ -75,7 +70,6 @@ final class AppModel {
     /// Where the person being met is, when the phone can tell.
     @ObservationIgnored let finder = NearbyFinder()
     @ObservationIgnored private var meetingEnd: Task<Void, Never>?
-    @ObservationIgnored private var popupEnd: Task<Void, Never>?
     @ObservationIgnored private var repeats: Task<Void, Never>?
     @ObservationIgnored private var lastPointed = Date.distantPast
     @ObservationIgnored private var meetingBegan = Date.distantPast
@@ -94,12 +88,34 @@ final class AppModel {
         }
         demo = value("-demo")
         demoStep = value("-step").flatMap { Int($0) } ?? 0
+        demoStepGiven = value("-step") != nil
         demoLink = value("-link")
         demoZoom = value("-zoom").flatMap { Double($0) } ?? 1
         demoTurn = value("-turn").flatMap { Double($0) } ?? 0
         pendingPasses = value("-simulate").flatMap { Int($0) } ?? 0
         pendingDelay = value("-after").flatMap { Double($0) } ?? 0
         demoSpotify = arguments.contains("-spotifydemo")
+        filmWide = arguments.contains("-filmwide")
+        if value("-demo") == "film" {
+            func list(_ flag: String) -> [String] {
+                (value(flag) ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            }
+            // Skin, hair, hair colour, eyes, mouth, hoodie, extra, as the numbers `Look` uses.
+            let l = list("-filmlook").compactMap { Int($0) }
+            let look = l.count == 7
+                ? Look(skin: l[0], hair: l[1], hairColor: l[2], eyes: l[3], mouth: l[4], hoodie: l[5], extra: l[6])
+                : Look.starter
+            let name = value("-filmname") ?? "Sam"
+            let artists = list("-filmartists")
+            var star = Profile(
+                id: UUID(), name: name, look: look, instagram: value("-filminsta") ?? "",
+                artists: artists, games: list("-filmgames"), greeting: value("-filmgreeting") ?? "Hi, I'm \(name)!")
+            // What they hold up need not be on their card: `-filmholds` names it by itself.
+            if let held = value("-filmholds") ?? artists.first {
+                star.holding = Holding(kind: .artist, title: held, picture: value("-filmpicture"))
+            }
+            filmStar = star
+        }
         state = arguments.contains("-reset") ? PlazaState() : store.load()
         if let demo { seed(for: demo) }
         try? store.save(state)
@@ -118,6 +134,8 @@ final class AppModel {
         pass.onStatus = { [weak self] status in self?.passStatus = status }
         finder.onToken = { [weak self] token in self?.pass.update(token: token) }
         finder.onFix = { [weak self] in self?.pointIsland() }
+        // "Skip" on the island is carried out here, with the app still out of sight.
+        SkipMeetingIntent.handler = { [weak self] in self?.skipMeeting() }
         applySettings()
         giveCardsToEarlierProfiles()
         findWhatIsShared()
@@ -137,12 +155,12 @@ final class AppModel {
     }
 
     /// The island shows nothing until someone is detected. During a meeting it names the person,
-    /// and with `announce` it opens up to say so.
+    /// asks whether to meet them while that is still open, and with `announce` it opens up to say so.
     private func syncIsland(announce: LiveActivityController.Announce = .no) {
         // The island is hidden while the app is on screen, so direction is only sent to it otherwise.
         let meet = meeting.map {
             LiveActivityController.Meet(
-                name: $0.name, until: $0.until,
+                name: $0.name, until: $0.until, asking: !$0.accepted,
                 bearing: onScreen ? nil : finder.bearing, distance: onScreen ? nil : finder.distance)
         }
         live.sync(wanted: state.me != nil && state.passingOn, canStart: onScreen, meeting: meet, announce: announce)
@@ -172,14 +190,13 @@ final class AppModel {
         onScreen = active
         if active { refreshSpotify() }
         if active, let meeting {
-            if meeting.until <= Date() {
+            if meeting.isOver(at: Date()) {
                 // A meeting that ran out while the app was asleep is over; do not show it on the way back in.
                 endMeeting()
             } else {
-                // Opened while the island was still pointing at someone: show them here too, and pick
-                // ranging back up, which iOS may have paused while the app was out of sight.
+                // Opened while the island was still on about someone: the panel here takes over, and
+                // ranging is picked back up, which iOS may have paused while the app was out of sight.
                 repeats?.cancel()
-                showPopup(until: meeting.until)
                 finder.resume()
             }
         }
@@ -197,11 +214,20 @@ final class AppModel {
         let passes = pendingPasses
         pendingPasses = 0
         if demo == "meet" {
+            // The question, with a made-up distance.
             simulatePass()
             finder.demoSweep()
         }
-        if demo == "sweep" {
+        if demo == "find" {
+            // After "Meet", with the arrow turning.
             simulatePass()
+            acceptMeeting()
+            finder.demoSweep()
+        }
+        if demo == "sweep" {
+            // After "Meet", on a phone that has not been moved about yet.
+            simulatePass()
+            acceptMeeting()
             finder.demoWaitingForSweep()
         }
         guard passes > 0 else { return }
@@ -394,6 +420,16 @@ final class AppModel {
         state.forgetEveryone()
     }
 
+    /// Back to the welcome, as on a new phone: your character, your links and everyone you passed
+    /// are gone. It is how the first-run screens get shown again at a demo.
+    func startOver() {
+        endMeeting()
+        SpotifyLink.logOut()
+        spotifyLoggedIn = false
+        state = PlazaState()
+        note("app", "started over from the welcome")
+    }
+
     /// Takes one person out of the plaza. An announcement about them ends with it.
     func forget(_ id: UUID) {
         let name = state.encounters.first { $0.id == id }?.profile.name ?? "someone"
@@ -414,35 +450,85 @@ final class AppModel {
         beginMeeting(with: profile, token: token)
     }
 
-    /// Starts "Time to make a new friend": the popup in the app for 15 seconds, the announcement on
-    /// the island, and two minutes of ranging so the island and the popup can point at them.
+    /// Starts "Time to make a new friend": the question on the island and in the app, and ranging,
+    /// so the question can already say how far away they are.
     private func beginMeeting(with profile: Profile, token: Data?) {
-        meetingEnd?.cancel()
         repeats?.cancel()
         meetingBegan = Date()
-        let until = meetingBegan.addingTimeInterval(Self.meetingLength)
-        meeting = Meeting(id: profile.id, name: profile.name, look: profile.look, until: until)
-        showPopup(until: until)
+        meeting = Meeting(id: profile.id, name: profile.name, look: profile.look, at: meetingBegan)
         if let token { finder.find(peer: token) }
         syncIsland(announce: .aloud)
-        meetingEnd = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(Self.meetingLength))
-            guard !Task.isCancelled else { return }
-            self?.endMeeting()
-        }
+        endMeetingWhenItRunsOut()
         if !onScreen { repeatAnnouncement(for: profile.id) }
     }
 
-    /// Puts the announcement up inside the app for 15 seconds, or until the meeting ends if that is sooner.
-    private func showPopup(until meetingEnds: Date) {
-        popupEnd?.cancel()
-        let until = min(meetingEnds, Date().addingTimeInterval(Self.popupLength))
-        popupUntil = until
-        popupEnd = Task { [weak self] in
+    private func endMeetingWhenItRunsOut() {
+        meetingEnd?.cancel()
+        guard let until = meeting?.until else { return }
+        meetingEnd = Task { [weak self] in
             try? await Task.sleep(for: .seconds(max(0, until.timeIntervalSinceNow)))
             guard !Task.isCancelled else { return }
-            self?.popupUntil = nil
+            self?.endMeeting()
         }
+    }
+
+    /// "Meet": the question closes and the phone points the way, for two minutes from now.
+    func acceptMeeting() {
+        guard var meeting, meeting.accept(at: Date()) else { return }
+        self.meeting = meeting
+        note("app", "said yes to meeting \(meeting.name)")
+        repeats?.cancel()
+        endMeetingWhenItRunsOut()
+        finder.resume()
+        syncIsland()
+    }
+
+    /// "Skip": the announcement goes away. They are still in the plaza with everyone else.
+    func skipMeeting() {
+        guard let meeting else {
+            // iOS restarted the app since the pass, so the meeting itself is forgotten. The island
+            // may still be asking: clear it.
+            syncIsland()
+            return
+        }
+        note("app", "skipped meeting \(meeting.name)\(onScreen ? "" : ", from the island")")
+        endMeeting()
+    }
+
+    // MARK: Film
+
+    /// Where the film's sound and its timings are kept, for tools/film.py to collect.
+    private var filmFolder: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Passby")
+    }
+
+    /// The film starts: the sounds go to a file instead of the speaker, and the moment is written
+    /// down so the picture and the sound can be lined up afterwards.
+    func filmBegins() {
+        let started = audio.record(to: filmFolder.appendingPathComponent("film.caf"), startNote: filmFolder.appendingPathComponent("film-sound.txt"))
+        try? "\(Date().timeIntervalSince1970)".write(to: filmFolder.appendingPathComponent("film-start.txt"), atomically: true, encoding: .utf8)
+        note("film", "started\(started ? "" : "; the sound could not be recorded")")
+    }
+
+    /// The person the film is about turns up among the people waiting. Nothing is announced.
+    func filmStarAppears() {
+        guard let filmStar else { return }
+        // Early evening reads better on the card than whatever time the clip was made.
+        let evening = Calendar.current.date(bySettingHour: 17, minute: 42, second: 0, of: Date()) ?? Date()
+        _ = state.recordPass(filmStar, at: evening)
+    }
+
+    func filmEnds() {
+        audio.stopRecording()
+        try? "\(Date().timeIntervalSince1970)".write(to: filmFolder.appendingPathComponent("film-end.txt"), atomically: true, encoding: .utf8)
+        note("film", "finished")
+    }
+
+    /// The app was opened by a link. "Meet" on the island is one: the answer was yes.
+    func open(_ url: URL) {
+        guard url.scheme == PassActivityAttributes.meetLink.scheme, url.host == PassActivityAttributes.meetLink.host else { return }
+        note("app", "opened from Meet on the island")
+        acceptMeeting()
     }
 
     /// With the app out of sight, opens the big island again every few seconds for a while.
@@ -453,7 +539,7 @@ final class AppModel {
             defer { UIApplication.shared.endBackgroundTask(keepAlive) }
             for _ in 0..<Self.repeatAnnouncements {
                 try? await Task.sleep(for: .seconds(Self.repeatEvery))
-                guard !Task.isCancelled, let self, self.meeting?.id == id, !self.onScreen else { return }
+                guard !Task.isCancelled, let self, self.meeting?.id == id, self.meeting?.accepted == false, !self.onScreen else { return }
                 self.syncIsland(announce: .quietly)
             }
         }
@@ -462,11 +548,8 @@ final class AppModel {
     func endMeeting() {
         meetingEnd?.cancel()
         meetingEnd = nil
-        popupEnd?.cancel()
-        popupEnd = nil
         repeats?.cancel()
         repeats = nil
-        popupUntil = nil
         guard meeting != nil else { return }
         note("app", "the meeting is over")
         meeting = nil
@@ -568,7 +651,16 @@ final class AppModel {
                 s.encounters[j].times = Int.random(in: 1...6, using: &rng)
             }
         }
-        if !["plaza", "gallery", "icon", "meet", "sweep", "diagnostics"].contains(demo) {
+        if demo == "film" {
+            // A quiet plaza: a handful of people, nobody of yours in the middle, and only the
+            // sounds, because the tune is laid under the clip afterwards.
+            // A wide view takes in far more floor, so it needs more people to look lived in.
+            s.encounters = Array(s.encounters.prefix(filmWide ? 12 : 5))
+            s.me?.artists = []
+            s.me?.games = []
+            s.musicOn = false
+        }
+        if !["plaza", "gallery", "hair", "icon", "meet", "find", "sweep", "diagnostics", "film"].contains(demo) {
             var lina = demoProfile(named: "Lina")
             lina.look = Look(skin: 2, hair: 3, hairColor: 1, eyes: 0, mouth: 0, hoodie: 7, extra: 0)
             lina.instagram = "lina.mtl"

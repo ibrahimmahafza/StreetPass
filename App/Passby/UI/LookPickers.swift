@@ -81,14 +81,29 @@ struct LookPickers: View {
 
 /// A text field in the app's style.
 struct FieldStyle: ViewModifier {
+    @Environment(\.console) private var console
+
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .font(Theme.font(16))
-            .foregroundStyle(Theme.ink)
-            .padding(.horizontal, 13)
-            .frame(height: 44)
-            .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .autocorrectionDisabled()
+        if console {
+            // On the first-run screens: a pill pressed into the panel.
+            content
+                .font(Theme.font(17, .bold))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 18)
+                .frame(height: 48)
+                .background(Capsule().fill(Color(hex: 0xF1F5F8)))
+                .overlay(Capsule().strokeBorder(Console.edge, lineWidth: 1.5))
+                .autocorrectionDisabled()
+        } else {
+            content
+                .font(Theme.font(16))
+                .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 13)
+                .frame(height: 44)
+                .background(Theme.fill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .autocorrectionDisabled()
+        }
     }
 }
 

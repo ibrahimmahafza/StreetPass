@@ -83,7 +83,6 @@ public final class PlazaScene {
     private static let crowdU = 0.10...0.90
     private static let crowdV = 0.27...0.65
     private static let ringV = 0.755
-    private static let greetV = 0.585
 
     /// Where new people stand to say hello, measured from your character: beside you first, then fanned out behind.
     private static let greetOffsets: [(x: Double, z: Double)] = [
@@ -103,6 +102,17 @@ public final class PlazaScene {
     public var me: Look?
     /// What your own character holds up, if anything.
     public var myHolding: Holding?
+    /// With nobody of yours in the middle, how far up the view newcomers stand to say hello
+    /// (0 is the bottom edge, 1 the top). Lower is nearer the viewer, and so bigger.
+    public var soloGreetHeight = 0.585
+    /// With nobody of yours in the middle, how far across the view a lone newcomer stands
+    /// (0 is the left edge, 1 the right). A group still lines up either side of the middle.
+    public var soloGreetAcross = 0.5
+    /// With nobody of yours in the middle, whether the others keep clear of whoever has walked up
+    /// to say hello, the way they otherwise keep clear of you.
+    public var givesArrivalsRoom = false
+    /// How much room that is: nobody else stops to stand closer to the newcomer than this.
+    public var arrivalRoom = PlazaScene.personalSpace
     /// The id your own character goes by among the actors.
     public let meID = UUID()
 
@@ -178,9 +188,13 @@ public final class PlazaScene {
                 walkers[i].patience = gap(spots[n], walkers[i].spot) / Self.arrivalSpeed * 2.5 + 4
             }
         }
-        // Anyone loitering where the newcomers are about to stand moves along, briskly.
+        // Anyone loitering where the newcomers are about to stand moves along, briskly. So does
+        // anyone inside the room newcomers are given, when they are given any.
+        let roomy = me == nil && givesArrivalsRoom
         for i in walkers.indices where walkers[i].mode == .wandering {
-            let inTheWay = !Crowd.isFree(walkers[i].moving ? walkers[i].goal : walkers[i].spot, among: spots, radius: Self.bodyRadius, margin: 0.4)
+            let place = walkers[i].moving ? walkers[i].goal : walkers[i].spot
+            let inTheWay = !Crowd.isFree(place, among: spots, radius: Self.bodyRadius, margin: 0.4)
+                || (roomy && spots.contains { gap($0, place) < arrivalRoom })
             if inTheWay {
                 walkers[i].moving = false
                 walkers[i].wait = 0
@@ -259,7 +273,7 @@ public final class PlazaScene {
             let w = walkers[i]
             taken.append(w.mode == .arriving || w.moving ? w.goal : w.spot)
         }
-        if me != nil { taken.append(home) }
+        if let keptClear { taken.append(keptClear) }
         for _ in 0..<12 {
             let candidate = spot(.random(in: 0...1, using: &rng), .random(in: 0...1, using: &rng))
             if Crowd.isFree(candidate, among: taken, radius: Self.bodyRadius, margin: 0.5), givesYouRoom(candidate),
@@ -273,19 +287,31 @@ public final class PlazaScene {
     /// Whether the straight walk between two spots passes through the room kept clear round you.
     /// Someone already inside it has to cross some of it to get out, so that does not count.
     private func cutsAcrossYou(from: Spot, to: Spot) -> Bool {
-        guard me != nil else { return false }
-        let centre = home
-        guard gap(from, centre) >= Self.personalSpace else { return false }
+        guard let centre = keptClear else { return false }
+        guard gap(from, centre) >= clearRadius else { return false }
         let dx = to.x - from.x, dz = to.z - from.z
         let length = dx * dx + dz * dz
         guard length > 1e-9 else { return false }
         let along = max(0, min(1, ((centre.x - from.x) * dx + (centre.z - from.z) * dz) / length))
-        return gap(Spot(x: from.x + dx * along, z: from.z + dz * along), centre) < Self.personalSpace
+        return gap(Spot(x: from.x + dx * along, z: from.z + dz * along), centre) < clearRadius
     }
 
     /// Whether a spot is far enough from your character to stand on.
     private func givesYouRoom(_ spot: Spot) -> Bool {
-        me == nil || gap(spot, home) >= Self.personalSpace
+        keptClear.map { gap(spot, $0) >= clearRadius } ?? true
+    }
+
+    /// How far everyone keeps from the middle of the room left clear.
+    private var clearRadius: Double {
+        me != nil ? Self.personalSpace : arrivalRoom
+    }
+
+    /// The middle of the room people leave clear: round your character, or, with nobody of yours
+    /// in the middle and `givesArrivalsRoom` set, round whoever has walked up to say hello.
+    private var keptClear: Spot? {
+        if me != nil { return home }
+        guard givesArrivalsRoom else { return nil }
+        return walkers.first { $0.mode == .arriving || $0.mode == .arrived }?.goal
     }
 
     private var ringCentre: Spot {
@@ -310,8 +336,9 @@ public final class PlazaScene {
         guard me != nil else {
             // Nobody in the middle to gather round: line up across the view instead.
             return (0..<count).map { n in
-                let u = min(0.8, max(0.2, 0.5 + (Double(n) - Double(count - 1) / 2) * 0.24))
-                let g = camera.ground(u: u, v: Self.greetV - Double(n % 2) * 0.03) ?? (0, -30)
+                let middle = count == 1 ? soloGreetAcross : 0.5
+                let u = min(0.8, max(0.2, middle + (Double(n) - Double(count - 1) / 2) * 0.24))
+                let g = camera.ground(u: u, v: soloGreetHeight - Double(n % 2) * 0.03) ?? (0, -30)
                 return Spot(x: g.x, z: g.z)
             }
         }

@@ -1,6 +1,8 @@
 #!/bin/bash
 # Build, install and launch in the simulator in a demo state, then take a screenshot.
 # usage: tools/sim.sh <demo> [out.png]      demo: plaza waiting card me people settings onboarding gallery
+#        meet (the Skip or Meet question)  find (after Meet, arrow turning)  sweep (after Meet, phone not moved yet)
+#        hair (every haircut from three sides)
 # env:   SIM=<simulator udid>  WAIT=<seconds before the screenshot>  NOBUILD=1 to skip the build
 #        SHOT_MAX=<longest side of the screenshot in pixels>
 #        ARGS="<launch arguments>" replaces the default "-reset -mute -demo <demo>"; ARGS="" launches plainly

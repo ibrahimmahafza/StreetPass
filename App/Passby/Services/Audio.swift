@@ -15,6 +15,9 @@ final class Audio {
     private let engine = AVAudioEngine()
     private let effects = AVAudioPlayerNode()
     private let speech = AVAudioPlayerNode()
+    /// Everything the engine plays passes through here, so a film can keep a copy of it.
+    private let bus = AVAudioMixerNode()
+    private var recording: AVAudioFile?
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private var wired = false
     private var music: AVAudioPlayer?
@@ -89,12 +92,42 @@ final class Audio {
         if !wired {
             engine.attach(effects)
             engine.attach(speech)
-            engine.connect(effects, to: engine.mainMixerNode, format: format)
-            engine.connect(speech, to: engine.mainMixerNode, format: format)
+            engine.attach(bus)
+            engine.connect(effects, to: bus, format: format)
+            engine.connect(speech, to: bus, format: format)
+            engine.connect(bus, to: engine.mainMixerNode, format: format)
             wired = true
         }
         if engine.isRunning { return true }
         return (try? engine.start()) != nil
+    }
+
+    /// For a film: writes the effects and the voice to `file` and keeps the speaker silent. The
+    /// time the file begins, in seconds since 1970, is written to `startNote`.
+    func record(to file: URL, startNote: URL) -> Bool {
+        guard startEngine() else { return false }
+        engine.mainMixerNode.outputVolume = 0
+        let heard = bus.outputFormat(forBus: 0)
+        try? FileManager.default.removeItem(at: file)
+        guard let out = try? AVAudioFile(forWriting: file, settings: heard.settings) else { return false }
+        recording = out
+        var noted = false
+        bus.installTap(onBus: 0, bufferSize: 2048, format: heard) { buffer, _ in
+            if !noted {
+                noted = true
+                // The first block of sound ends about now, so the file began one block ago.
+                let began = Date().timeIntervalSince1970 - Double(buffer.frameLength) / heard.sampleRate
+                try? "\(began)".write(to: startNote, atomically: true, encoding: .utf8)
+            }
+            try? out.write(from: buffer)
+        }
+        return true
+    }
+
+    func stopRecording() {
+        guard recording != nil else { return }
+        bus.removeTap(onBus: 0)
+        recording = nil
     }
 
     /// Starts everything at zero volume and reports what happened. Used by `-audiocheck`.

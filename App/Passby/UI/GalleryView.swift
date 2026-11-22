@@ -66,3 +66,33 @@ struct GalleryView: View {
         .background(Color(hex: 0xF8FCFE))
     }
 }
+
+/// Every haircut from the front, the side and behind, close up. Opened with `-demo hair` to check the shapes.
+struct HairGalleryView: View {
+    private static let turns: [CGFloat] = [0.3, 1.25, 2.75]
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 0) {
+            ForEach(0..<Look.hairCount * Self.turns.count, id: \.self) { i in
+                Image(uiImage: CharacterSnapshot.image(
+                    Self.look(i / Self.turns.count), framing: .head, size: CGSize(width: 330, height: 330), turn: Self.turns[i % Self.turns.count]))
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 94)
+            }
+        }
+        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(hex: 0xF8FCFE))
+    }
+
+    private static func look(_ hair: Int) -> Look {
+        var look = Look.starter
+        look.hair = hair
+        look.hairColor = hair
+        look.skin = hair % Look.skinCount
+        look.hoodie = hair
+        return look
+    }
+}
+

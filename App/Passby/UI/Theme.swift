@@ -26,38 +26,52 @@ extension Color {
 /// The green button for the main action on a screen.
 struct GoButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.console) private var console
 
+    @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.font(17, .bold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(hex: 0x49D683), Color(hex: 0x31C26C)], startPoint: .top, endPoint: .bottom))
-                    .shadow(color: Theme.greenDark, radius: 0, y: configuration.isPressed ? 0 : 2)
-                    .shadow(color: Theme.greenDark.opacity(0.28), radius: 7, y: 6)
-            )
-            .offset(y: configuration.isPressed ? 2 : 0)
-            .opacity(enabled ? 1 : 0.45)
+        if console {
+            // On the first-run screens the main action is a glowing glossy pill instead.
+            ConsolePill(label: configuration.label, pressed: configuration.isPressed)
+        } else {
+            configuration.label
+                .font(Theme.font(17, .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(LinearGradient(colors: [Color(hex: 0x49D683), Color(hex: 0x31C26C)], startPoint: .top, endPoint: .bottom))
+                        .shadow(color: Theme.greenDark, radius: 0, y: configuration.isPressed ? 0 : 2)
+                        .shadow(color: Theme.greenDark.opacity(0.28), radius: 7, y: 6)
+                )
+                .offset(y: configuration.isPressed ? 2 : 0)
+                .opacity(enabled ? 1 : 0.45)
+        }
     }
 }
 
 /// The white button for everything else.
 struct PlainButtonStyleWhite: ButtonStyle {
+    @Environment(\.console) private var console
+
+    @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.font(16, .bold))
-            .foregroundStyle(Theme.ink)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(LinearGradient(colors: [.white, Color(hex: 0xF6F8F9)], startPoint: .top, endPoint: .bottom))
-                    .shadow(color: Color(hex: 0xDFE5E9), radius: 0, y: configuration.isPressed ? 0 : 2)
-            )
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
-            .offset(y: configuration.isPressed ? 2 : 0)
+        if console {
+            ConsolePill(label: configuration.label, pressed: configuration.isPressed, main: false)
+        } else {
+            configuration.label
+                .font(Theme.font(16, .bold))
+                .foregroundStyle(Theme.ink)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(LinearGradient(colors: [.white, Color(hex: 0xF6F8F9)], startPoint: .top, endPoint: .bottom))
+                        .shadow(color: Color(hex: 0xDFE5E9), radius: 0, y: configuration.isPressed ? 0 : 2)
+                )
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.line, lineWidth: 1))
+                .offset(y: configuration.isPressed ? 2 : 0)
+        }
     }
 }

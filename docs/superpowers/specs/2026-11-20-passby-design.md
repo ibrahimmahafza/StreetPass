@@ -313,3 +313,135 @@ one steps up, otherwise the card closes. An announcement about them ends too. As
 everyone", nothing is blocked: a phone that is still in range, or passes again later, comes
 back as a new person (my choice; he did not say which he wanted).
 
+## A decision instead of a countdown (2026-11-22, build 9)
+
+Achraf: "the dynamic island (fake one) in-app has to be re-made into a real dynamic island
+element and the count down shouldn't be a count down but rather a sort of yes no, hit, skip
+kinda button with a decision w/ the green border around the big island pulsing".
+
+- The announcement is now a question with two answers, "Skip" and "Meet". The bar that ran
+  down fifteen seconds is gone and so is the fifteen seconds: it stays until answered. Left
+  alone it ends after two minutes, because the other person has walked on by then. The rules
+  are `Meeting` in PassbyCore, with tests.
+- "Meet" turns the announcement into the pointing view (arrow, distance, what the phone needs),
+  for two minutes from the yes or until "Done". Tapping the person there opens their card.
+  "Skip" closes it. Either way the person is in the plaza as before.
+- The real Dynamic Island has the same two buttons on its big form, and so has the Lock Screen
+  row. "Skip" is an App Intent (`SkipMeetingIntent`), which iOS runs inside the app without
+  opening it. "Meet" is a link (`passby://meet`) because a yes has to open the app: the phone
+  can only work out the way to someone while the app is on screen.
+- iOS does not show an app's own Live Activity while that app is on screen, so the real
+  island cannot be what you see inside the app. What the app draws there is now made to be the
+  same thing: the big island's shape, corner and margins, in the island's own place, opening
+  out of the real island and closing back into it, the clock and battery stepping aside as
+  they do under the real one, and the same words and buttons (`ChoiceLabel`, shared by both).
+- The green edge pulses inside the app while the question is open. On the real island the
+  edge is green but steady: iOS draws that edge itself and does not let a Live Activity run a
+  repeating animation.
+
+Checked in the simulator: the question stays up well past fifteen seconds; "Meet", "Done" and
+"Skip" inside the app; "Skip" and "Meet" on the real island with the app out of sight. Not
+checked: the Lock Screen row (the simulator would not lock), and all of it on a real phone.
+
+## Sculpted hair (2026-11-22, build 10)
+
+Achraf wanted the haircuts to look like the Miis': "it doesn't have to be the exact shape, but
+the artistic direction has to be similar w/ the angles and stuff", plus "kind of glow the way
+mii have". The Mii hairstyles themselves were not copied or used as models; what was taken is
+the general direction he described, done with Passby's own shapes:
+
+- Each of the eight haircuts (same names, same order, so existing characters keep theirs) is
+  now one solid sculpted shape instead of a dome with boxes and balls: thick, with a hard cut
+  edge, hairlines made of straight lines with corners (temples, sideburns, a squared nape, a
+  point on the bun's hairline, a jagged fringe on the spikes), creases where it is combed, and
+  pointed tips. `HairMesh` builds a shape from two things per angle round the head: how low the
+  hair reaches and how far it stands off the head.
+- Hair is glossy: a sharper highlight than the rest of the character, a soft band of shine
+  round the crown and a paler rim, in a lighter tone of the hair's own colour. The buzz cut
+  hardly shines.
+- A cap or beanie presses the hair flat on top; the bun loses its knot under one.
+
+Checked by eye in the simulator (`tools/sim.sh hair`, `gallery`, `plaza`, `me`, `card`). The app
+icon still shows the old hair; it is a saved picture and was not redrawn.
+
+## A clip for the demo (2026-11-22)
+
+Achraf asked for a short video for the ad or demo: his character appearing, walking into the
+plaza to the front and introducing itself, with the card of his interests coming up, and none
+of the app's controls on screen.
+
+- The app has a film mode, `-demo film`: no buttons, bars or status bar; a few people in the
+  plaza and nobody of yours in the middle; after a moment the person described by the
+  `-film...` launch arguments pops into the ring, walks to the front while the view eases in on
+  them, and their card opens with no buttons on it.
+- `tools/film.py` records it in a simulator without a Dynamic Island, collects the sounds the
+  app made (the app keeps the speaker silent and writes them to a file), lays the plaza tune
+  under them, and cuts a twelve-second clip with a fade at each end.
+- Two things in the plaza itself changed for it and apply to the app too. Someone who turns up
+  after the plaza has filled now pops into place. And with nobody of yours in the middle, a
+  newcomer can be given a place nearer the viewer and room around them (`soloGreetHeight`,
+  `givesArrivalsRoom` on `PlazaScene`, with tests); only the film uses that.
+
+The clip made that night shows only what was known of his profile: his look, his greeting and
+one artist. The cover his character holds in it is an album cover by that artist, not the same
+one his phone shows, which could not be identified from a screenshot.
+
+He then asked for it in landscape instead of portrait. `tools/film.py --wide` does that: the
+app, which is otherwise upright only, turns on its side for a film (`-filmwide`), the plaza
+fills the wide picture, the card is a panel in the bottom right, and the newcomer stands a
+little left of the middle with more floor kept clear round them (`soloGreetAcross`,
+`arrivalRoom` on `PlazaScene`, with tests). The view starts on the crowd and the ring and eases
+in about four times closer as they walk up. The recording is turned upright again and cut to the
+middle 16:9, 1920 by 1080.
+
+## First-run screens with a console-menu feel (2026-11-22, build 11)
+
+Achraf: "let's now try to work on the onboarding, try to make it look better/ look more like a
+wii menu ... since we'll be demoing that". The Wii Menu itself (its channel grid, bottom bar,
+logo, sounds) was not copied. What was taken is the general feel of a 2000s console's setup
+menu, done as Passby's own design (`Console` in `ConsoleKit.swift`):
+
+- A bright white screen with fine level lines, fading into the plaza's floor lower down.
+- The character large in the middle on a lit disc. It gives a little jump when it changes.
+- The step named in a glossy pill at the top with a bar per step; one glossy pill at the
+  bottom to move on, with a round one beside it to go back.
+- A blue glow that breathes on whatever is picked or wants pressing: the main pill, the open
+  tab, the tile in use, and the two link tiles until something is linked.
+- A welcome first: the name of the app, one line about it, and "Start".
+- Making the character is now tabs and tiles (`LookStudio`): a round tab per part, and every
+  choice for that part as a tile showing the character with it, instead of seven rows of
+  arrows. The "Your character" sheet in the plaza still uses the rows.
+- The link screens (`LinkEntry`) are unchanged inside; the app's ordinary buttons and fields
+  take the glossy look wherever `\.console` is set in the environment, which is only here.
+- Settings has "Start over from the welcome", behind one confirmation, so the first-run
+  screens can be shown again at a demo without reinstalling. It removes the character, the
+  links and everyone passed.
+
+Checked in the simulator by tapping through from the welcome to the plaza, with the keyboard
+up for the name and for a game, and by starting over from Settings. Not checked on a phone.
+
+## "You both like…" opens into a list (2026-11-22, build 12)
+
+Achraf asked for names two people have in common to be green, and for "a common interests
+section on profiles with the label 'you both like...'" that shows the list when expanded.
+
+- The green was already there from build 6: on someone's card, the artists and games you also
+  list are bold and green in "Listens to" and "Plays". That stays.
+- The one-line "You both like Stromae, Angèle and 1 more" is now a section. Closed, it is a
+  green row: "You both like…", how many things, and an arrow. Tapped, it opens into the list,
+  best match first: each thing with its cover when this phone has one (the plain card with a
+  music note or a game pad otherwise), its name in green, and whether it is an artist or a
+  game. Past four it scrolls, so a long list cannot push the card off the screen.
+
+Checked in the simulator on the demo card (two artists and a game in common), including the
+scrolling case. Not checked on a phone.
+
+## The island's green edge keeps up with it (2026-11-22, build 13)
+
+Achraf noticed that inside the app the green edge opened more slowly than the black island.
+Measured frame by frame in the simulator: while the black shape grew from 167 to 481 pixels the
+edge stayed at 157 and only caught up about a second later. The edge was a separate layer whose
+pulse was an animation of its own, and that animation was also being applied to the edge's
+shape. The black shape and the edge are now one view (`IslandBody`), drawn from the same
+outline on every frame, with the pulse worked out from the clock rather than animated. After
+the change the edge sits 8 to 10 pixels outside the black shape on every frame of the opening.

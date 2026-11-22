@@ -234,6 +234,92 @@ final class PlazaSceneTests: XCTestCase {
 
     // MARK: In their hands
 
+    // MARK: With nobody of yours in the middle
+
+    func testWithNobodyInTheMiddleANewcomerCanBeGivenTheFrontOfTheViewAndRoomAroundThem() throws {
+        let (scene, people) = makeScene(people: 8, waiting: 1, seed: 4, withMe: false)
+        scene.soloGreetHeight = 0.44
+        scene.givesArrivalsRoom = true
+        run(scene, seconds: 10)
+        var arrived = false
+        let newcomer = try XCTUnwrap(people.last)
+        scene.beginArrival([newcomer.id]) { arrived = true }
+        var standingTooClose = 0
+        for frame in 0..<Int(40 / dt) {
+            scene.step(dt)
+            // Once the others have had time to move along, nobody stops to stand near the newcomer.
+            guard frame > 600 else { continue }
+            let actors = scene.actors(time: 0)
+            let star = try XCTUnwrap(actors.first { $0.id == newcomer.id })
+            for actor in actors where actor.id != newcomer.id && actor.walkPhase == nil {
+                if gap(actor, star) < PlazaScene.personalSpace - 0.35 { standingTooClose += 1 }
+            }
+        }
+        XCTAssertTrue(arrived)
+        XCTAssertLessThan(Double(standingTooClose) * dt, 3)
+        // They stand where they were told to: in the middle, that far up the view.
+        let star = try XCTUnwrap(scene.actors(time: 0).first { $0.id == newcomer.id })
+        let spot = try XCTUnwrap(scene.camera.ground(u: 0.5, v: 0.44))
+        XCTAssertEqual(star.x, spot.x, accuracy: 0.6)
+        XCTAssertEqual(star.z, spot.z, accuracy: 0.6)
+    }
+
+    func testWithNobodyInTheMiddleANewcomerCanBePlacedToOneSideOfTheView() throws {
+        // A wide view, as when the phone is on its side.
+        let scene = PlazaScene(seed: 4)
+        scene.camera = PlazaCamera(aspect: 844.0 / 390.0)
+        scene.soloGreetAcross = 0.4
+        scene.soloGreetHeight = 0.46
+        scene.givesArrivalsRoom = true
+        let people = (0..<6).map { person($0) } + [person(100, waiting: true)]
+        scene.sync(people)
+        var arrived = false
+        let newcomer = try XCTUnwrap(people.last)
+        scene.beginArrival([newcomer.id]) { arrived = true }
+        run(scene, seconds: 20)
+        XCTAssertTrue(arrived)
+        let star = try XCTUnwrap(scene.actors(time: 0).first { $0.id == newcomer.id })
+        let spot = try XCTUnwrap(scene.camera.ground(u: 0.4, v: 0.46))
+        XCTAssertEqual(star.x, spot.x, accuracy: 0.6)
+        XCTAssertEqual(star.z, spot.z, accuracy: 0.6)
+    }
+
+    func testTheRoomLeftRoundANewcomerCanBeMadeBigger() throws {
+        let scene = PlazaScene(seed: 9)
+        scene.camera = PlazaCamera(aspect: 844.0 / 390.0)
+        scene.givesArrivalsRoom = true
+        scene.arrivalRoom = 7.5
+        let people = (0..<10).map { person($0) } + [person(100, waiting: true)]
+        scene.sync(people)
+        run(scene, seconds: 8)
+        let newcomer = try XCTUnwrap(people.last)
+        scene.beginArrival([newcomer.id]) {}
+        var standingTooClose = 0
+        for frame in 0..<Int(40 / dt) {
+            scene.step(dt)
+            guard frame > 720 else { continue }
+            let actors = scene.actors(time: 0)
+            let star = try XCTUnwrap(actors.first { $0.id == newcomer.id })
+            for actor in actors where actor.id != newcomer.id && actor.walkPhase == nil {
+                if gap(actor, star) < 7.5 - 0.35 { standingTooClose += 1 }
+            }
+        }
+        XCTAssertLessThan(Double(standingTooClose) * dt, 3)
+    }
+
+    func testWithoutBeingAskedNothingChangesWhenNobodyIsInTheMiddle() throws {
+        let (scene, people) = makeScene(people: 4, waiting: 1, seed: 4, withMe: false)
+        var arrived = false
+        let newcomer = try XCTUnwrap(people.last)
+        scene.beginArrival([newcomer.id]) { arrived = true }
+        run(scene, seconds: 15)
+        XCTAssertTrue(arrived)
+        let star = try XCTUnwrap(scene.actors(time: 0).first { $0.id == newcomer.id })
+        let spot = try XCTUnwrap(scene.camera.ground(u: 0.5, v: 0.585))
+        XCTAssertEqual(star.x, spot.x, accuracy: 0.6)
+        XCTAssertEqual(star.z, spot.z, accuracy: 0.6)
+    }
+
     func testSomeoneCanBeGivenSomethingElseToHoldOnThisPhone() throws {
         let scene = PlazaScene(seed: 4)
         var someone = person(1)

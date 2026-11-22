@@ -83,7 +83,8 @@ enum Character3D {
         face.renderingOrder = 1
         neck.addChildNode(face)
 
-        addHair(look.hair, hair, skin: skin, to: neck)
+        // A cap or a beanie presses the hair flat on top.
+        addHair(look.hair, hair, skin: skin, underHat: look.extra == 2 || look.extra == 4, to: neck)
         addExtra(look.extra, top: top, to: neck)
         return root
     }
@@ -219,66 +220,22 @@ enum Character3D {
 
     // MARK: Hair
 
-    private static func addHair(_ style: Int, _ hair: RGB, skin: RGB, to body: SCNNode) {
-        /// The hair on top: an oval dome a little bigger than the skull, so the head cuts its lower edge into a hairline.
-        func cap(_ rx: CGFloat = 18.3, _ ry: CGFloat = 10.5, _ rz: CGFloat = 17.7, y: CGFloat = 93.5, z: CGFloat = -1.5, color: RGB? = nil) {
-            put(SCNSphere(radius: 1), color ?? hair, 0, y, z, in: body).scale = SCNVector3(rx, ry, rz)
-        }
-        func back(downTo bottom: CGFloat, width: CGFloat = 30, depth: CGFloat = 8) {
-            put(box(width, 97 - bottom, depth, 3.8), hair.mix(-0.06), 0, (97 + bottom) / 2, -15.6 + depth / 2, in: body)
-        }
-        func sides(downTo bottom: CGFloat, depth: CGFloat = 18) {
-            for s: CGFloat in [-1, 1] {
-                put(box(5.6, 95 - bottom, depth, 2.6), hair.mix(-0.04), s * 15.4, (95 + bottom) / 2, -3, in: body)
-            }
-        }
-
-        switch style {
-        case 0:
-            cap()
-            back(downTo: 76)
-        case 1:
-            cap()
-            back(downTo: 76)
-            let fringe = put(SCNSphere(radius: 1), hair, -5.5, 90.6, 13.2, in: body)
-            fringe.scale = SCNVector3(11.5, 4.4, 4.2)
-            fringe.eulerAngles.z = 0.26
-        case 2:
-            cap()
-            back(downTo: 78)
-            put(SCNSphere(radius: 7.4), hair, 0, 108, -4, in: body)
-        case 3:
-            cap()
-            back(downTo: 52, width: 31, depth: 9)
-            sides(downTo: 58)
-        case 4:
-            let lumps: [(CGFloat, CGFloat, CGFloat)] = [
-                (-11.5, 96, 8.5), (-4, 98, 10), (4, 98, 10), (11.5, 96, 8.5),
-                (-12.5, 101, -1), (-4.5, 103.5, -1), (4.5, 103.5, -1), (12.5, 101, -1),
-                (-11.5, 96.5, -10.5), (-4, 98.5, -12), (4, 98.5, -12), (11.5, 96.5, -10.5),
-                (-8, 86, -13), (0, 86, -14), (8, 86, -13), (-16, 90, -2), (16, 90, -2),
-            ]
-            for (i, p) in lumps.enumerated() {
-                put(SCNSphere(radius: 7.4), hair.mix(i % 2 == 0 ? 0 : -0.05), p.0, p.1, p.2, in: body)
-            }
-        case 5:
-            cap(17.5, 9.4, 16.9, y: 92.8, z: -1.2, color: hair.blend(skin, 0.2))
-        case 6:
-            cap()
-            back(downTo: 78)
-            for row in 0..<2 {
-                for i in 0..<4 {
-                    let x = CGFloat(i) * 7.4 - 11.1
-                    let spike = put(SCNCone(topRadius: 0, bottomRadius: 5, height: 12), hair, x, 105, CGFloat(5 - row * 11), in: body)
-                    spike.eulerAngles = SCNVector3(row == 0 ? 0.3 : -0.3, 0, Float(x) * -0.03)
-                }
-            }
-        default:
-            cap()
-            back(downTo: 70, width: 31, depth: 9)
-            sides(downTo: 70, depth: 20)
-            let fringe = put(SCNSphere(radius: 1), hair, 0, 90.8, 12.6, in: body)
-            fringe.scale = SCNVector3(13.5, 3.8, 4)
+    /// The haircut: one sculpted shape from `HairMesh`, glossy, plus the knot on top for the bun.
+    private static func addHair(_ style: Int, _ hair: RGB, skin: RGB, underHat: Bool, to body: SCNNode) {
+        // A buzz cut is so short the skin shows through it, and it hardly shines.
+        let buzz = style == 5
+        let finish = hairMaterial(buzz ? hair.blend(skin, 0.2) : hair, gloss: buzz ? 0.3 : 1)
+        let shape = SCNNode(geometry: HairMesh.geometry(style: style, underHat: underHat))
+        shape.geometry?.firstMaterial = finish
+        body.addChildNode(shape)
+        if style == 2, !underHat {
+            let knot = SCNSphere(radius: 7)
+            knot.segmentCount = 40
+            knot.firstMaterial = finish
+            let node = SCNNode(geometry: knot)
+            node.position = SCNVector3(0, 106.2, -5)
+            node.scale = SCNVector3(1.06, 0.9, 1.06)
+            body.addChildNode(node)
         }
     }
 
@@ -345,6 +302,33 @@ enum Character3D {
         m.specular.contents = UIColor(white: 0.12, alpha: 1)
         m.shininess = 0.2
         materials[key] = m
+        return m
+    }
+
+    private static var hairMaterials: [String: SCNMaterial] = [:]
+
+    /// Hair: glossier than the rest, with a soft band of shine round the crown and a lighter rim,
+    /// both in a paler tone of the hair's own colour. `gloss` runs from 0, matt, to 1.
+    private static func hairMaterial(_ color: RGB, gloss: CGFloat) -> SCNMaterial {
+        let key = "\(color.r),\(color.g),\(color.b),\(gloss)"
+        if let cached = hairMaterials[key] { return cached }
+        let m = SCNMaterial()
+        m.lightingModel = .blinn
+        m.diffuse.contents = UIColor(cgColor: color.cg())
+        m.specular.contents = UIColor(white: 0.12 + 0.5 * gloss, alpha: 1)
+        m.shininess = 0.2 + 0.45 * gloss
+        m.setValue(Float(gloss), forKey: "gloss")
+        m.shaderModifiers = [.surface: """
+            #pragma arguments
+            float gloss;
+            #pragma body
+            float3 up = normalize((scn_frame.inverseViewTransform * float4(_surface.normal, 0.0)).xyz);
+            float band = smoothstep(0.34, 0.6, up.y) * (1.0 - smoothstep(0.66, 0.9, up.y));
+            float rim = pow(1.0 - clamp(dot(_surface.normal, _surface.view), 0.0, 1.0), 3.0);
+            float3 pale = _surface.diffuse.rgb * 0.45 + float3(0.55);
+            _surface.emission.rgb += pale * (band * 0.22 + rim * 0.16) * gloss;
+            """]
+        hairMaterials[key] = m
         return m
     }
 

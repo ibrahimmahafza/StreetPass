@@ -2,7 +2,8 @@ import ActivityKit
 import Foundation
 
 /// Keeps one Live Activity that, for a couple of minutes after someone is detected, says
-/// "Time to make a new friend" on the Dynamic Island. The rest of the time it shows nothing there.
+/// "Time to make a new friend" on the Dynamic Island and asks whether to meet them or skip them.
+/// The rest of the time it shows nothing there.
 ///
 /// It runs all the time anyway because iOS only lets an app start a Live Activity while it is on
 /// screen: it starts as soon as the app opens, empty, and is then filled in from the background
@@ -13,6 +14,8 @@ final class LiveActivityController {
     struct Meet: Equatable {
         var name: String
         var until: Date
+        /// True while the question is still open, so the big island shows "Skip" and "Meet".
+        var asking: Bool
         var bearing: Double?
         var distance: Double?
     }
@@ -50,7 +53,7 @@ final class LiveActivityController {
             return
         }
         let state = PassActivityAttributes.ContentState(
-            meeting: meeting?.name, bearing: meeting?.bearing, distance: meeting?.distance)
+            meeting: meeting?.name, bearing: meeting?.bearing, distance: meeting?.distance, asking: meeting?.asking)
         // The announcement expires by itself: once `until` passes, iOS redraws the activity as stale
         // and the widget goes back to showing nothing, even if the app is not running to tell it to.
         let content = ActivityContent(state: state, staleDate: meeting?.until)

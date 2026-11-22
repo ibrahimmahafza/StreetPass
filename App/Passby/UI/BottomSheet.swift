@@ -11,6 +11,8 @@ enum Sheet: Equatable {
 /// The white panel every menu and card sits in.
 struct BottomSheet<Content: View>: View {
     let title: String
+    /// False leaves out the close button, for a film.
+    var closes = true
     let onClose: () -> Void
     @ViewBuilder var content: Content
 
@@ -21,15 +23,17 @@ struct BottomSheet<Content: View>: View {
                     .font(Theme.font(18, .bold))
                     .lineLimit(1)
                 Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.soft)
-                        .frame(width: 34, height: 34)
-                        .background(Theme.fill, in: Circle())
-                        .overlay(Circle().stroke(Theme.line, lineWidth: 1))
+                if closes {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Theme.soft)
+                            .frame(width: 34, height: 34)
+                            .background(Theme.fill, in: Circle())
+                            .overlay(Circle().stroke(Theme.line, lineWidth: 1))
+                    }
+                    .accessibilityLabel("Close")
                 }
-                .accessibilityLabel("Close")
             }
             content
         }
